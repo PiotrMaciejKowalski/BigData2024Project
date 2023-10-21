@@ -1,1 +1,1 @@
-użyteczne pliki i komponenty, które nie są ściśle powiązane z projektem.
+Użyteczne pliki i komponenty, które nie są ściśle powiązane z projektem.
