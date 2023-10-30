@@ -1,6 +1,7 @@
 # Research zbioru danych NASA
 
 Zbior danych w formacie csv znajduję się na wspólnym drive w lokalizacj: https://drive.google.com/drive/u/1/folders/1tLGM4LURHCXctHuTUSmO_kr3JCzJJSPS
+
 Dokumanacja zbioru danych: https://hydro1.gesdisc.eosdis.nasa.gov/data/NLDAS/NLDAS2_README.pdf 
 
 Opis zbioru danych
