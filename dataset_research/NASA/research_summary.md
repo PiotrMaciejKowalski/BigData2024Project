@@ -1,8 +1,8 @@
-# Research zbioru danych NASA
+# Dataset NASA
 
-Zbiór danych w formacie csv: [Dataset NASA](https://drive.google.com/drive/u/1/folders/1tLGM4LURHCXctHuTUSmO_kr3JCzJJSPS)
+Link do zbioru danych: [Dataset NASA](https://drive.google.com/drive/u/1/folders/1tLGM4LURHCXctHuTUSmO_kr3JCzJJSPS)
 
-Dokumentacja zbioru danych: [Dataset NASA - dokumentacja](https://hydro1.gesdisc.eosdis.nasa.gov/data/NLDAS/NLDAS2_README.pdf)
+Link do dokumentacji zbioru danych: [Dataset NASA - dokumentacja](https://hydro1.gesdisc.eosdis.nasa.gov/data/NLDAS/NLDAS2_README.pdf)
 
 ## Opis zbioru danych
 
@@ -19,7 +19,7 @@ Dokumentacja zbioru danych: [Dataset NASA - dokumentacja](https://hydro1.gesdisc
     * północną część Bahamów - 14 pozycji
 
 
- Zbiór zawiera 53 kolumny:
+## Opis poszczególnych kolumn
 
 Nazwa | Pełna nazwa | Jednostka | Metoda pomiaru | Opis
 --- | --- | --- | --- | ---
