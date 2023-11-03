@@ -1,8 +1,7 @@
-#Pobieranie danych z Wikipedii
-
-Program powstał w celu zaimportowania danych z Polskiej Wikipedii i zapisaniu ich w pliku csv. \\
-Źródło danych: https://dumps.wikimedia.org/plwiki/20231001/ \\
-Z powyższej strony pobrano 7 plików XML (siedem, a nie jeden, bo colab nie był w stanie go przetworzyć) spakowanych w formacie bz2. Pliki zostały rozpakowane i wrzucone na Google Driva i kolejno przetwarzane zgodnie z poniższym kodem. \\
+# Pobieranie danych z Wikipedii
+Program powstał w celu zaimportowania danych z Polskiej Wikipedii i zapisaniu ich w pliku csv. \
+[Link do strony z danymi](https://dumps.wikimedia.org/plwiki/20231001/)  \
+Z powyższej strony pobrano 7 plików XML (siedem, a nie jeden, bo colab nie był w stanie go przetworzyć) spakowanych w formacie bz2. Pliki zostały rozpakowane i wrzucone na Google Driva i kolejno przetwarzane zgodnie z poniższym kodem. \
 Poniższe kody dotyczą przetworzenia pierwszego z siedmiu plików. Kolene pliki przetworzono analogicznie.
 
 Import bibliotek
@@ -153,8 +152,7 @@ df.to_csv('/content/drive/MyDrive/Colab Notebooks/Analiza BIG DATA/Wikipedia/PLw
 
 Tym samym kodem przetworzyłem 7 plików i utworzyłem 7 plików csv.
 
-#Łączenie plików CSV
-
+# Łączenie plików CSV
 Z powodu dużego rozmiaru plików ich połącznie wykonano na komputerze osobistym. Fragmenty użytych poleceń znajdziemy niżej.
 
 Rozmiary plików:
@@ -186,5 +184,5 @@ result = pd.concat(frames, ignore_index=True)
 result.to_csv('D:/Analiza BIG DATA/Zadanie_wikipedia/csv/Laczenie/PLwiki_1_2.csv',index=False,header=True)
 ```
 
-Finalny plik csv na dysku:https://drive.google.com/drive/folders/1BOLoAhgkEwRROaTHjCInhxWYAsXVQZtP?usp=share_link
+Finalny plik csv na dysku pod [linkiem](https://drive.google.com/drive/folders/1BOLoAhgkEwRROaTHjCInhxWYAsXVQZtP?usp=share_link).
 Dodano również plik PLwiki_1, bo dużo mniejszy.
