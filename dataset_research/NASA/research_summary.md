@@ -6,7 +6,7 @@ Link do dokumentacji zbioru danych: [Dataset NASA - dokumentacja](https://hydro1
 
 ## Opis zbioru danych
 
-* Prezentacja danych w formie miesięcznych podsumowań (srednie, sumy).
+* Prezentacja danych w formie miesięcznych podsumowań (średnie, sumy).
 * Okres pomiarów - 285 miesięcy - od stycznia 2000 roku do września 2023 roku.
 * Obszar pomiarów (środkowa Ameryka Północna):
   * szerokość geograficzna - od 25,0625 do 52,9375 stopni, co 1/8 stopnia
