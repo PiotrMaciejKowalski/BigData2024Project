@@ -97,7 +97,7 @@ Dla naszej aplikacji utworzymy dwa podstawowe testy:
 1. Czy zwraca wartości zgodne z formułą.
 2. Czy zwraca błąd dla nieprawidłowych wartości (właściwy typ danych wymusza użycie "*typingu*": `plec: bin, wzrost: int, waga: int`, ale o tym w innym poradniku).
 
-> Za **dobrą praktykę** tworzenia testów uważa się kolejność: *napisanie testu &rarr; uruchomienie testu z oczekiwanym błędem &rarr; poprawienie aplikacji &rarr; ponowne uruchomienie testu z oczekiwanym pozytywnym wynikiem*.
+Za **dobrą praktykę** tworzenia testów uważa się kolejność: *napisanie testu &rarr; uruchomienie testu z oczekiwanym błędem &rarr; poprawienie aplikacji &rarr; ponowne uruchomienie testu z oczekiwanym pozytywnym wynikiem*.
 
 ### Zaczynajmy!
 
