@@ -9,11 +9,11 @@ Pytest jest framework-iem, który ułatwia pisanie testów jednostkowych w Pytho
 Na wstępie należy podkreślić dwa fakty:
 1. Testy powstały z myślą o **aplikacjach**, co oznacza, że mają one testować **metody** z danych **klas** np. czy zwracają odpowiedni format, wymiar, czy nie ma nulli itp. Jest to najwygodniejsza forma to rozbudowanych aplikacji.
 
-> Z uwagi na charakter naszego zadania oraz strukturę projektu, testować będziemy wyłącznie elementy z `/lib`, a w tym te użyte potem w notatnikach.
+Z uwagi na charakter naszego zadania oraz strukturę projektu, testować będziemy wyłącznie elementy z `/lib`, a w tym te użyte potem w notatnikach.
 
 2. W programowaniu TDD (Test-driven development), wychodzi się od **wpierw** napisania testów, a następnie napisania aplikacji.
 
-> Z uwagi na nierównomiene rozłożenie umiejętności w programowaniu TDD wewnątrz zespołu, ta metodyka nie będzie wymuszana podczas tworzenia aplikacji.
+Z uwagi na nierównomiene rozłożenie umiejętności w programowaniu TDD wewnątrz zespołu, ta metodyka nie będzie wymuszana podczas tworzenia aplikacji.
 
 # Aplikacja
 
