@@ -2,7 +2,7 @@
 Wyrażenia regularne są potężnym narzędziem do analizy i manipulacji tekstem. Pozwalają one wyszukiwać wzorce tekstowe, co jest przydatne w procesie analizy danych, przetwarzania tekstu i walidacji danych. Poniżej znajdziesz podstawowe informacje i przykłady używania regex.
 
 Wyrażenia regularne możemy podzielić na kilka grupy:
-### 1. Klasy znaku
+## 1. Klasy znaku
 Klasa znaków dopasowuje dowolny zestaw znaków.
 | Klasa znaków | Opis | Wzorce | Jest zgodny z |
 | :---: | --- | --- | --- |
@@ -18,7 +18,7 @@ Klasa znaków dopasowuje dowolny zestaw znaków.
 | \\S | Dopasuje dowolny znak bez odstępu. | \\s\\S | " _" w elemencie "int __ctr" |
 | \\d | Dopasuje dowolną cyfrę dziesiętną. | \\d | "4" w elemencie "4 = IV" |
 | \\D | Dopasuje dowolny znak inny niż cyfra dziesiętna. | \\D | " ", "=", " ", "I", "V" w "4 = IV" |
-### 2. Kotwice
+## 2. Kotwice
 Kotwice powodują, że sukces lub niepowodzenie dopasowywania jest zależne od bieżącej pozycji w ciągu, ale nie powodują, że aparat przechodzi do dalszej części ciągu lub używa znaków.
 | Asercja | Opis | Wzorce | Jest zgodny z |
 | :---: | --- | --- | --- |
@@ -30,12 +30,12 @@ Kotwice powodują, że sukces lub niepowodzenie dopasowywania jest zależne od b
 | \\G | Dopasowanie musi występować w punkcie, w którym zakończyło się poprzednie dopasowanie, lub jeśli nie było poprzedniego dopasowania, na pozycji w ciągu, w którym rozpoczęto dopasowywanie. | \\G\\(\\d\\) | "(1)", "(3)" i "(5)" w"(1)(3)(5)\[7\](9)" |
 | \\b | Dopasowanie musi występować na granicy między znakiem \\w (alfanumerycznym) i znakiem \\W (niefanumerycznym). | \\b\\w+\\s\\w+\\b | "them theme", "them them" w "them theme them them" |
 | \\B | Dopasowanie nie może występować na \\b granicy. | \\Bend\\w*\\b | "ends", "ender" w "end sends endure lender" |
-### 3. Konstrukty grupujące
+## 3. Konstrukty grupujące
 Konstrukcje grupujące wyznaczają podwyrażenia wyrażeń regularnych i często przechwytywane podciągi ciągu wejściowego.
 | Konstrukcja grupująca | Opis | Wzorce | Jest zgodny z |
 | :---: | --- | --- | --- |
 | (*Subexpression*) | Przechwytuje dopasowane podwyrażenia i przypisuje mu liczbę porządkową (liczone od zera). | (\\w)\\1 | "ee" w elemencie "deep" |
-### 4. Kwantyfikatory
+## 4. Kwantyfikatory
 Kwantyfikator określa, ile wystąpień poprzedniego elementu (którym może być znak, grupa lub klasa znaków) musi znajdować się w ciągu wejściowym, aby wystąpiło dopasowanie.
 | Kwantyfikator | Opis | Wzorce | Jest zgodny z |
 | :---: | --- | --- | --- |
@@ -49,7 +49,7 @@ Kwantyfikator określa, ile wystąpień poprzedniego elementu (którym może by�
 | +?  | Dopasowuje poprzedni element raz lub większą liczbę razy (przy czym ta liczba jest jak najmniejsza). | "be+?" | "be" w "been" lub "be" w "bent" |
 | ??  | Dopasowuje poprzedni element zero lub jeden raz (przy czym liczba dopasowań jest jak najmniejsza). | "rai??" | "ra" w elemencie "rain" |
 | {*N*}? | Dopasuje poprzedni element dokładnie _n_ razy. | ",\\d{3}?" | ",043" w "1,043.6" lub ",876", ",543", ",210" w "9,876,543,210" |
-### 5. Konstrukty naprzemienne
+## 5. Konstrukty naprzemienne
 Konstrukcje zmiany modyfikują wyrażenie regularne, aby umożliwić dopasowanie typu albo/albo.
 | Konstrukcje zmiany | Opis | Wzorce | Jest zgodny z |
 | :---: | --- | --- | --- |
