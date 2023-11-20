@@ -1,6 +1,8 @@
 repos:
--   repo: https://github.com/mwouts/jupytext
-    rev: v1.14.7  # CURRENT_TAG/COMMIT_HASH
-    hooks:
-    - id: jupytext
-      args: [--sync]
+
+- repo: local
+  hooks:
+    - id: strip-notebooks
+      name: Strip notebooks
+      entry: ./.hooks/strip_notebooks.sh
+      language: script
