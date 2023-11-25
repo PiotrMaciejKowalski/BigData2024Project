@@ -94,5 +94,3 @@ nasa = nasa.drop("Date")
 nasa.show(5)
 
 
-
-
