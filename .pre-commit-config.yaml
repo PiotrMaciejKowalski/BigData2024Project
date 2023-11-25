@@ -1,0 +1,8 @@
+repos:
+
+- repo: local
+  hooks:
+    - id: strip-notebooks
+      name: Strip notebooks
+      entry: ./.hooks/strip_notebooks.sh
+      language: script
