@@ -74,27 +74,31 @@ niepustynia_przy_GBD = NASA_lato[(NASA_lato['lon'] >= -124) & (NASA_lato['lon'] 
 ##### GVEG (wskaźnik roślinności)
 """
 
+def plot_histogram(ax, data, column, title, color):
+    ax.hist(data[column], bins=20, color=color, edgecolor="black")
+    ax.set_title(title)
+    ax.set_xlabel(column)
+    ax.set_ylabel("Frequency")
+    ax.set_xlim(min(min(CD[column]), min(CD_i_niepustynia[column]), min(niepustynia_przy_CD[column]),
+                    min(CP[column]), min(CP_i_niepustynia[column]), min(niepustynia_przy_CP[column]),
+                    min(GBD[column]), min(GBD_i_niepustynia[column]), min(niepustynia_przy_GBD[column])), 
+                max(max(CD[column]), max(CD_i_niepustynia[column]), max(niepustynia_przy_CD[column]),
+                    max(CP[column]), max(CP_i_niepustynia[column]), max(niepustynia_przy_CP[column]),
+                    max(GBD[column]), max(GBD_i_niepustynia[column]), max(niepustynia_przy_GBD[column])))
+
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
-def plot_histogram(ax, data, title, color):
-    ax.hist(data['GVEG'], bins=20, color=color, edgecolor="black")
-    ax.set_title(title)
-    ax.set_xlabel("GVEG")
-    ax.set_ylabel("Frequency")
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 40)
+plot_histogram(axes[0, 0], CD, 'GVEG', "CD_pustynia", "orange")
+plot_histogram(axes[0, 1], CD_i_niepustynia, 'GVEG', "CD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[0, 2], niepustynia_przy_CD, 'GVEG', "CD_nie-pustynia", "green")
 
-plot_histogram(axes[0, 0], CD, "CD_pustynia", "orange")
-plot_histogram(axes[0, 1], CD_i_niepustynia, "CD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[0, 2], niepustynia_przy_CD, "CD_nie-pustynia", "green")
+plot_histogram(axes[1, 0], CP, 'GVEG', "CP_pustynia", "orange")
+plot_histogram(axes[1, 1], CP_i_niepustynia, 'GVEG', "CP_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[1, 2], niepustynia_przy_CP, 'GVEG', "CP_nie-pustynia", "green")
 
-plot_histogram(axes[1, 0], CP, "CP_pustynia", "orange")
-plot_histogram(axes[1, 1], CP_i_niepustynia, "CP_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[1, 2], niepustynia_przy_CP, "CP_nie-pustynia", "green")
-
-plot_histogram(axes[2, 0], GBD, "GBD_pustynia", "orange")
-plot_histogram(axes[2, 1], GBD_i_niepustynia, "GBD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[2, 2], niepustynia_przy_GBD, "GBD_nie-pustynia", "green")
+plot_histogram(axes[2, 0], GBD, 'GVEG', "GBD_pustynia", "orange")
+plot_histogram(axes[2, 1], GBD_i_niepustynia, 'GVEG', "GBD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'GVEG', "GBD_nie-pustynia", "green")
 
 plt.tight_layout()
 plt.show()
@@ -121,25 +125,17 @@ print("GVEG_graniczne:", GVEG_graniczne)
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
-def plot_histogram(ax, data, title, color):
-    ax.hist(data['Rainf'], bins=20, color=color, edgecolor="black")
-    ax.set_title(title)
-    ax.set_xlabel("Rainf")
-    ax.set_ylabel("Frequency")
-    ax.set_xlim(0, 220)
-    ax.set_ylim(0, 175)
+plot_histogram(axes[0, 0], CD, 'Rainf', "CD_pustynia", "orange")
+plot_histogram(axes[0, 1], CD_i_niepustynia, 'Rainf', "CD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[0, 2], niepustynia_przy_CD, 'Rainf', "CD_nie-pustynia", "green")
 
-plot_histogram(axes[0, 0], CD, "CD_pustynia", "orange")
-plot_histogram(axes[0, 1], CD_i_niepustynia, "CD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[0, 2], niepustynia_przy_CD, "CD_nie-pustynia", "green")
+plot_histogram(axes[1, 0], CP, 'Rainf', "CP_pustynia", "orange")
+plot_histogram(axes[1, 1], CP_i_niepustynia, 'Rainf', "CP_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[1, 2], niepustynia_przy_CP, 'Rainf', "CP_nie-pustynia", "green")
 
-plot_histogram(axes[1, 0], CP, "CP_pustynia", "orange")
-plot_histogram(axes[1, 1], CP_i_niepustynia, "CP_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[1, 2], niepustynia_przy_CP, "CP_nie-pustynia", "green")
-
-plot_histogram(axes[2, 0], GBD, "GBD_pustynia", "orange")
-plot_histogram(axes[2, 1], GBD_i_niepustynia, "GBD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[2, 2], niepustynia_przy_GBD, "GBD_nie-pustynia", "green")
+plot_histogram(axes[2, 0], GBD, 'Rainf', "GBD_pustynia", "orange")
+plot_histogram(axes[2, 1], GBD_i_niepustynia, 'Rainf', "GBD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'Rainf', "GBD_nie-pustynia", "green")
 
 plt.tight_layout()
 plt.show()
@@ -166,25 +162,17 @@ print("Rainf_graniczne:", Rainf_graniczne)
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
-def plot_histogram(ax, data, title, color):
-    ax.hist(data['Evap'], bins=20, color=color, edgecolor="black")
-    ax.set_title(title)
-    ax.set_xlabel("Evap")
-    ax.set_ylabel("Frequency")
-    ax.set_xlim(0, 120)
-    ax.set_ylim(0, 50)
+plot_histogram(axes[0, 0], CD, 'Evap', "CD_pustynia", "orange")
+plot_histogram(axes[0, 1], CD_i_niepustynia, 'Evap', "CD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[0, 2], niepustynia_przy_CD, 'Evap', "CD_nie-pustynia", "green")
 
-plot_histogram(axes[0, 0], CD, "CD_pustynia", "orange")
-plot_histogram(axes[0, 1], CD_i_niepustynia, "CD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[0, 2], niepustynia_przy_CD, "CD_nie-pustynia", "green")
+plot_histogram(axes[1, 0], CP, 'Evap', "CP_pustynia", "orange")
+plot_histogram(axes[1, 1], CP_i_niepustynia, 'Evap', "CP_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[1, 2], niepustynia_przy_CP, 'Evap', "CP_nie-pustynia", "green")
 
-plot_histogram(axes[1, 0], CP, "CP_pustynia", "orange")
-plot_histogram(axes[1, 1], CP_i_niepustynia, "CP_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[1, 2], niepustynia_przy_CP, "CP_nie-pustynia", "green")
-
-plot_histogram(axes[2, 0], GBD, "GBD_pustynia", "orange")
-plot_histogram(axes[2, 1], GBD_i_niepustynia, "GBD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[2, 2], niepustynia_przy_GBD, "GBD_nie-pustynia", "green")
+plot_histogram(axes[2, 0], GBD, 'Evap', "GBD_pustynia", "orange")
+plot_histogram(axes[2, 1], GBD_i_niepustynia, 'Evap', "GBD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'Evap', "GBD_nie-pustynia", "green")
 
 plt.tight_layout()
 plt.show()
@@ -211,25 +199,17 @@ print("Evap_graniczne:", Evap_graniczne)
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
-def plot_histogram(ax, data, title, color):
-    ax.hist(data['AvgSurfT'], bins=20, color=color, edgecolor="black")
-    ax.set_title(title)
-    ax.set_xlabel("AvgSurfT")
-    ax.set_ylabel("Frequency")
-    ax.set_xlim(260, 310)
-    ax.set_ylim(0, 40)
+plot_histogram(axes[0, 0], CD, 'AvgSurfT', "CD_pustynia", "orange")
+plot_histogram(axes[0, 1], CD_i_niepustynia, 'AvgSurfT', "CD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[0, 2], niepustynia_przy_CD, 'AvgSurfT', "CD_nie-pustynia", "green")
 
-plot_histogram(axes[0, 0], CD, "CD_pustynia", "orange")
-plot_histogram(axes[0, 1], CD_i_niepustynia, "CD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[0, 2], niepustynia_przy_CD, "CD_nie-pustynia", "green")
+plot_histogram(axes[1, 0], CP, 'AvgSurfT', "CP_pustynia", "orange")
+plot_histogram(axes[1, 1], CP_i_niepustynia, 'AvgSurfT', "CP_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[1, 2], niepustynia_przy_CP, 'AvgSurfT', "CP_nie-pustynia", "green")
 
-plot_histogram(axes[1, 0], CP, "CP_pustynia", "orange")
-plot_histogram(axes[1, 1], CP_i_niepustynia, "CP_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[1, 2], niepustynia_przy_CP, "CP_nie-pustynia", "green")
-
-plot_histogram(axes[2, 0], GBD, "GBD_pustynia", "orange")
-plot_histogram(axes[2, 1], GBD_i_niepustynia, "GBD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[2, 2], niepustynia_przy_GBD, "GBD_nie-pustynia", "green")
+plot_histogram(axes[2, 0], GBD, 'AvgSurfT', "GBD_pustynia", "orange")
+plot_histogram(axes[2, 1], GBD_i_niepustynia, 'AvgSurfT', "GBD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'AvgSurfT', "GBD_nie-pustynia", "green")
 
 plt.tight_layout()
 plt.show()
@@ -256,26 +236,17 @@ print("AvgSurfT_graniczne:", AvgSurfT_graniczne)
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
-def plot_histogram(ax, data, title, color):
-    ax.hist(data['Albedo'], bins=20, color=color, edgecolor="black")
-    ax.set_title(title)
-    ax.set_xlabel("Albedo")
-    ax.set_ylabel("Frequency")
-    ax.set_xlim(15, 70)
-    ax.set_ylim(0, 100)
+plot_histogram(axes[0, 0], CD, 'Albedo', "CD_pustynia", "orange")
+plot_histogram(axes[0, 1], CD_i_niepustynia, 'Albedo', "CD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[0, 2], niepustynia_przy_CD, 'Albedo', "CD_nie-pustynia", "green")
 
-plot_histogram(axes[0, 0], CD, "CD_pustynia", "orange")
-plot_histogram(axes[0, 1], CD_i_niepustynia, "CD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[0, 2], niepustynia_przy_CD, "CD_nie-pustynia", "green")
+plot_histogram(axes[1, 0], CP, 'Albedo', "CP_pustynia", "orange")
+plot_histogram(axes[1, 1], CP_i_niepustynia, 'Albedo', "CP_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[1, 2], niepustynia_przy_CP, 'Albedo', "CP_nie-pustynia", "green")
 
-plot_histogram(axes[1, 0], CP, "CP_pustynia", "orange")
-plot_histogram(axes[1, 1], CP_i_niepustynia, "CP_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[1, 2], niepustynia_przy_CP, "CP_nie-pustynia", "green")
-
-plot_histogram(axes[2, 0], GBD, "GBD_pustynia", "orange")
-plot_histogram(axes[2, 1], GBD_i_niepustynia, "GBD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[2, 2], niepustynia_przy_GBD, "GBD_nie-pustynia", "green")
-
+plot_histogram(axes[2, 0], GBD, 'Albedo', "GBD_pustynia", "orange")
+plot_histogram(axes[2, 1], GBD_i_niepustynia, 'Albedo', "GBD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'Albedo', "GBD_nie-pustynia", "green")
 plt.tight_layout()
 plt.show()
 
@@ -301,25 +272,17 @@ print("Albedo_graniczne:", Albedo_graniczne)
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
-def plot_histogram(ax, data, title, color):
-    ax.hist(data['SoilT_40_100cm'], bins=20, color=color, edgecolor="black")
-    ax.set_title(title)
-    ax.set_xlabel("SoilT_40_100cm")
-    ax.set_ylabel("Frequency")
-    ax.set_xlim(265, 305)
-    ax.set_ylim(0, 50)
+plot_histogram(axes[0, 0], CD, 'SoilT_40_100cm', "CD_pustynia", "orange")
+plot_histogram(axes[0, 1], CD_i_niepustynia, 'SoilT_40_100cm', "CD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[0, 2], niepustynia_przy_CD, 'SoilT_40_100cm', "CD_nie-pustynia", "green")
 
-plot_histogram(axes[0, 0], CD, "CD_pustynia", "orange")
-plot_histogram(axes[0, 1], CD_i_niepustynia, "CD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[0, 2], niepustynia_przy_CD, "CD_nie-pustynia", "green")
+plot_histogram(axes[1, 0], CP, 'SoilT_40_100cm', "CP_pustynia", "orange")
+plot_histogram(axes[1, 1], CP_i_niepustynia, 'SoilT_40_100cm', "CP_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[1, 2], niepustynia_przy_CP, 'SoilT_40_100cm', "CP_nie-pustynia", "green")
 
-plot_histogram(axes[1, 0], CP, "CP_pustynia", "orange")
-plot_histogram(axes[1, 1], CP_i_niepustynia, "CP_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[1, 2], niepustynia_przy_CP, "CP_nie-pustynia", "green")
-
-plot_histogram(axes[2, 0], GBD, "GBD_pustynia", "orange")
-plot_histogram(axes[2, 1], GBD_i_niepustynia, "GBD_pustynia/nie-pustynia", "yellow")
-plot_histogram(axes[2, 2], niepustynia_przy_GBD, "GBD_nie-pustynia", "green")
+plot_histogram(axes[2, 0], GBD, 'SoilT_40_100cm', "GBD_pustynia", "orange")
+plot_histogram(axes[2, 1], GBD_i_niepustynia, 'SoilT_40_100cm', "GBD_pustynia/nie-pustynia", "yellow")
+plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'SoilT_40_100cm', "GBD_nie-pustynia", "green")
 
 plt.tight_layout()
 plt.show()
@@ -348,7 +311,7 @@ NASA = NASA[['lon', 'lat', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo', 'SoilT_40_100c
 NASA['klasyfikacja'] = np.nan
 
 
-def classify(row):
+def classify(row: pd.DataFrame):
     conditions = [
         row['Rainf'] <= Rainf_graniczne,
         row['Evap'] <= Evap_graniczne,
@@ -373,5 +336,3 @@ pustynia_percentage = (NASA['klasyfikacja'] == "pustynia").sum() / len(NASA)
 
 
 print("pustynia_percentage:", pustynia_percentage)
-
-
