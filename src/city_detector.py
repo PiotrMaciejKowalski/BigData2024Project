@@ -1,9 +1,76 @@
 #Wymagane: utworzone środowisko pyspark, sesja spark oraz połaczenie z dyskiem
-from typing import Optional
+from typing import Optional, Dict
+import pandas as pd
 from pandas import read_csv as pd_read_csv
 from pyspark.sql import SparkSession
-from pyspark.sql import DataFrame, Column
+from pyspark.sql import DataFrame as SparkDataFrame, Column
+from pyspark.sql import DataFrame #FIXME should be deleted since duplicated
 from pyspark.sql.functions import col, when, isnull, isnan
+
+
+class City_Geolocalization_Data():
+
+  def __init__(self, path: str) -> None:
+    """
+    Constructor shall initialize geodata for cities based on given csv file
+    internally we shall store it as pandas data frame
+    """
+    #FIXME add assertions 
+    self.geodata = pd.read_csv(path, header=True)
+    #FIXME confirm that geodata contains no duplicates (the same pair (lon, lat) )
+
+  def get_cityname(
+      self,
+      lon: float,
+      lat: float,
+      ) -> Optional[str]:
+      return self.geodata[ (self.geodata.lon == lon) & (self.geodata.lat == lat)].miasto.iloc[0]
+
+  def pandas_bulk_get_geodata(
+      self,
+      df: pd.DataFrame,
+      city: Optional[bool] = True,
+      state: Optional[bool] = False,
+      country: Optional[bool] = False
+      ) -> pd.DataFrame:
+    assert "lon" in df.columns
+    assert "lat" in df.columns
+    _dx = df[['lon', 'lat']]
+    columns = []
+    if city: columns.append('miasto')
+    if state: columns.append('stan')
+    if country: columns.append('państwo')
+    if len(columns) == 0:
+      return None
+    else:
+      return _dx.merge(self.geodata[columns],on = ('lon', 'lat'))
+
+  def __pandas_bulk_get_all_geodata( #private version for unbounded data load
+    self,
+    city: Optional[bool] = True,
+    state: Optional[bool] = False,
+    country: Optional[bool] = False
+    ) -> pd.DataFrame:
+    columns = ['lon', 'lat']
+    if city: columns.append('miasto')
+    if state: columns.append('stan')
+    if country: columns.append('państwo')
+    return self.geodata[columns]
+  
+  def spark_add_geodata(
+      self,
+      sdf: SparkDataFrame,
+      city: Optional[bool] = True,
+      state: Optional[bool] = False,
+      country: Optional[bool] = False
+  ) ->SparkDataFrame:
+    
+    pandas_geodata = self.__pandas_bulk_get_all_geodata(city=city, state=state, country=country)
+    spark_session: SparkSession = sdf.sql_ctx.sparkSession
+    spark_geodata = spark_session.createDataFrame(pandas_geodata)
+    return sdf.join(spark_geodata, sdf.lat==spark_geodata.lat & sdf.lon==spark_geodata.lon, 'left')
+
+    
 
 spark = SparkSession.builder\
         .master("local")\
