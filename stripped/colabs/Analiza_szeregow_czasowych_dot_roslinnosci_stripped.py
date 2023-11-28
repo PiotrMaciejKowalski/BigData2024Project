@@ -19,12 +19,18 @@ Utworzenie środowiska pyspark do obliczeń:
 import os
 os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
 os.environ["SPARK_HOME"] = "/content/spark-3.5.0-bin-hadoop3"
+
+
 import findspark
 findspark.init()
-from pyspark.sql import SparkSession
-from google.colab import drive
-from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
+
+
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import pandas as pd
+from google.colab import drive
+from pyspark.sql import SparkSession
+from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
 
 
 """
@@ -49,24 +55,25 @@ drive.mount('/content/drive')
 Wczytanie danych NASA znajdujących się na dysku w sparku:
 """
 
-# Wczytanie zbioru sampled w celu pobrania nazw kolumn
-sampled = pd.read_csv('/content/drive/MyDrive/BigMess/NASA/sampled_NASA_200k.csv')
+columns = ['lon', 'lat', 'Date', 'SWdown', 'LWdown', 'SWnet', 'LWnet', 'Qle', 'Qh', 'Qg', 'Qf', 'Snowf', 'Rainf', 'Evap', 'Qs', 'Qsb', 'Qsm', 'AvgSurfT', 'Albedo', 'SWE', 'SnowDepth', 'SnowFrac', 'SoilT_0_10cm', 'SoilT_10_40cm', 
+           'SoilT_40_100cm', 'SoilT_100_200cm', 'SoilM_0_10cm', 'SoilM_10_40cm', 'SoilM_40_100cm', 'SoilM_100_200cm', 'SoilM_0_100cm', 'SoilM_0_200cm', 'RootMoist', 'SMLiq_0_10cm', 'SMLiq_10_40cm', 'SMLiq_40_100cm', 'SMLiq_100_200cm', 
+           'SMAvail_0_100cm', 'SMAvail_0_200cm', 'PotEvap', 'ECanop', 'TVeg', 'ESoil', 'SubSnow', 'CanopInt', 'ACond', 'CCond', 'RCS', 'RCT', 'RCQ', 'RCSOL', 'RSmin','RSMacr', 'LAI', 'GVEG', 'Streamflow']
 
 # Utworzenie schematu określającego typ zmiennych
-schemat = StructType()
-for i in sampled.columns:
+schema = StructType()
+for i in columns:
   if i == "Date":
-    schemat = schemat.add(i, StringType(), True)
+    schema = schema.add(i, StringType(), True)
   else:
-    schemat = schemat.add(i, FloatType(), True)
+    schema = schema.add(i, FloatType(), True)
 
 
 # Wczytanie zbioru Nasa w sparku
-nasa = spark.read.format('csv').option("header", True).schema(schemat).load('/content/drive/MyDrive/BigMess/NASA/NASA.csv')
+nasa = spark.read.format('csv').option("header", True).schema(schema).load('/content/drive/MyDrive/BigMess/NASA/NASA.csv')
 
 
 """
-Zanim zacznimy pisać kwerendy należy jeszcze dodać nasz DataFrame (df) do "przestrzeni nazw tabel" Sparka:
+Zanim zaczniemy pisać kwerendy należy jeszcze dodać nasz DataFrame (df) do "przestrzeni nazw tabel" Sparka:
 """
 
 nasa.createOrReplaceTempView("nasa")
@@ -76,7 +83,7 @@ nasa.createOrReplaceTempView("nasa")
 Rozdzielenie kolumny "Date" na kolumny "Year" oraz "Month"
 """
 
-nasa = spark.sql("""
+nasa_ym = spark.sql("""
           SELECT
           CAST(SUBSTRING(CAST(Date AS STRING), 1, 4) AS INT) AS Year,
           CAST(SUBSTRING(CAST(Date AS STRING), 5, 2) AS INT) AS Month,
@@ -85,61 +92,58 @@ nasa = spark.sql("""
           """)
 
 
-nasa = nasa.drop("Date")
-nasa.createOrReplaceTempView("nasa")
+nasa_ym = nasa_ym.drop("Date")
+nasa_ym.createOrReplaceTempView("nasa_ym")
 
 
 """
 # Analiza szergów czasowych  dot. roślinności
 """
 
-# Import biblotek
-import matplotlib.pyplot as plt
-import random
-import matplotlib.gridspec as gridspec
-
-
 # Ograniczenie zbioru nasa do wartości, które potrzebujemy, ustawienie pomiaru zawsze na 1 dzień miesiąca
-szeregNasa = spark.sql("""
-                      SELECT
-                      lon, lat,
-                      to_date(CONCAT(Year, '-', Month, '-1')) as Date, GVEG, LAI
-                      FROM nasa
-                      order by lon, lat, Date
-                      """)
-
-
-%%time
-szeregNasa.show(5)
+time_series = spark.sql("""
+                        SELECT
+                        lon, lat,
+                        to_date(CONCAT(Year, '-', Month, '-1')) as Date, GVEG
+                        FROM nasa_ym
+                        order by lon, lat, Year, Month
+                        """)
 
 
 # Wyzanczenie unikatowych par współrzednych ze zbioru Nasa i zapisanie w Pandas
 %%time
 distinct_wsp = spark.sql("""
-                          SELECT DISTINCT lon, lat from nasa
+                          SELECT DISTINCT lon, lat FROM nasa
                           """).toPandas()
 
 
 distinct_wsp.shape
 
 
-# Funkcja generująca wykres w czasie wartości zmiennej GVEG - green vegetation dla zadanych współrzednych
-def wykres_szeregu(lon, lat):
+# FIXME przenieść do katalogu src / @see (https://app.clickup.com/t/86bwj0nt4)
+def time_series_GVEG(lon: float, lat: float):
+  """
+  Funkcja generująca wykres w czasie wartości zmiennej GVEG (green vegetation) dla zadanych współrzednych.
+
+  Parametry:
+  - lon (float): długość geograficzna
+  - lat (float): szerokość geograficzna
+  """
   # ograniczenie zbioru do konkretnej pary współrzędnych
-  szereg = szeregNasa.filter((szeregNasa['lon'] == lon) & (szeregNasa['lat'] == lat)).drop('lon', 'lat')
+  series = time_series.filter((time_series['lon'] == lon) & (time_series['lat'] == lat)).drop('lon', 'lat')
   # Przejście na pandas
-  szeregPandas = szereg.toPandas()
+  time_series_Pandas = series.toPandas()
   # Ustawienie 'date' jako indeksu
-  szeregPandas.set_index('Date', inplace=True)
+  time_series_Pandas.set_index('Date', inplace=True)
   # Obliczanie 12-miesięcznej średniej kroczącej
-  szeregPandas['12m_MA'] = szeregPandas['GVEG'].rolling(window=12).mean()
+  time_series_Pandas['12m_MA'] = time_series_Pandas['GVEG'].rolling(window=12).mean()
   # Tworzenie wykresu
   plt.figure(figsize=(11,6))
   gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
-  xmin, xmax = szeregPandas.index.min() - pd.DateOffset(years=1) , szeregPandas.index.max() + pd.DateOffset(years=1)
+  xmin, xmax = time_series_Pandas.index.min() - pd.DateOffset(years=1) , time_series_Pandas.index.max() + pd.DateOffset(years=1)
   ax1 = plt.subplot(gs[0])
-  ax1.plot(szeregPandas.index, szeregPandas['GVEG']) #'LAI' - do rozważenia - zmienna opisująca wskaźnik pokrycia liścio
-  ax1.plot(szeregPandas.index, szeregPandas['12m_MA'], label='12-miesięczna średnia krocząca', color='red')
+  ax1.plot(time_series_Pandas.index, time_series_Pandas['GVEG']) 
+  ax1.plot(time_series_Pandas.index, time_series_Pandas['12m_MA'], label='12-miesięczna średnia krocząca', color='red')
   ax1.set_title(f'Wykres Szeregu Czasowego (lon {lon}, lat {lat})')
   ax1.legend(loc='upper left')
   ax1.set_ylabel('Wartość GVEG')
@@ -147,7 +151,7 @@ def wykres_szeregu(lon, lat):
   ax1.grid(True)
 
   ax2 = plt.subplot(gs[1])
-  ax2.plot(szeregPandas.index, szeregPandas['12m_MA'], label='12-miesięczna średnia krocząca', color='red')
+  ax2.plot(time_series_Pandas.index, time_series_Pandas['12m_MA'], label='12-miesięczna średnia krocząca', color='red')
   ax2.set_xlabel('Data')
   ax2.grid(True)
   ax2.set_xlim(xmin, xmax)
@@ -157,12 +161,12 @@ def wykres_szeregu(lon, lat):
 
 
 # losujemy 10 par wspołrzednych ze zbioru nasa
-wylosowane = random.sample(range(76360), 10)
+random = distinct_wsp.sample(10)
 
 
 # sprawdzenie szeregu czasowego dla wylosowanych współrzędnych
-for i in wylosowane:
-  wykres_szeregu(distinct_wsp.iloc[i,0], distinct_wsp.iloc[i,1])
+for index, row in random.iterrows():
+  time_series_GVEG(row['lon'], row['lat'])
 
 
 # pustynia mojave i jej "obrzeża" (ograniczenie terenu do współrzednych wytyczających skrajne krańce pustyni)
@@ -170,11 +174,13 @@ mojave = distinct_wsp[(distinct_wsp['lon'] >= -116.15) &  (distinct_wsp['lon']  
 
 
 # losujemy 10 współrzednych z zakresu pustyni mojave i jej obrzeży
-wylosowane = random.sample(mojave.index.tolist(), 10)
+random_mojave = mojave.sample(10)
 
 
 # sprawdzenie szeregu czasowego dla wylosowanych współrzędnych
-for i in wylosowane:
-  wykres_szeregu(distinct_wsp.iloc[i,0], distinct_wsp.iloc[i,1])
+for index, row in random_mojave.iterrows():
+  time_series_GVEG(row['lon'], row['lat'])
+
+
 
 
