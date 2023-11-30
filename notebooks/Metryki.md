@@ -1,4 +1,4 @@
-# **Metryki**
+8# **Metryki**
 
 ## **1. Metryki dla modelu klasyfikacji terenu (pustynia/nie-pustynia)**
 
@@ -19,3 +19,5 @@ Więcej informacji na temat tych metryk:
 
  * ROC curve
  * Precision-Recall Curve
+
+Informacje na temat ROV Curve: [LINK](https://medium.com/analytics-vidhya/what-is-roc-curve-1f776103c998)
