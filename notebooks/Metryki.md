@@ -20,4 +20,4 @@ Więcej informacji na temat tych metryk:
  * ROC curve
  * Precision-Recall Curve
 
-Informacje na temat ROV Curve: [LINK](https://medium.com/analytics-vidhya/what-is-roc-curve-1f776103c998)
+Informacje na temat ROC Curve: [LINK](https://medium.com/analytics-vidhya/what-is-roc-curve-1f776103c998)
