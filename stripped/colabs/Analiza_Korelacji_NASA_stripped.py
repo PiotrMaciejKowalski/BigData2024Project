@@ -8,6 +8,7 @@ import numpy as np
 import seaborn as sns
 from prettytable import PrettyTable
 from google.colab import drive
+from google.colab import files
 
 !pip install pyspark
 import pyspark
@@ -26,10 +27,13 @@ Teraz zaimportujemy dane
 
 drive.mount('/content/drive')
 
-sampled = pd.read_csv('/content/drive/MyDrive/BigMess/NASA/sampled_NASA_200k.csv')
+columns = ['lon', 'lat', 'Date', 'SWdown', 'LWdown', 'SWnet', 'LWnet', 'Qle', 'Qh', 'Qg', 'Qf', 'Snowf', 'Rainf', 'Evap', 'Qs', 'Qsb', 'Qsm', 'AvgSurfT', 'Albedo', 'SWE', 'SnowDepth', 'SnowFrac', 'SoilT_0_10cm', 'SoilT_10_40cm',
+           'SoilT_40_100cm', 'SoilT_100_200cm', 'SoilM_0_10cm', 'SoilM_10_40cm', 'SoilM_40_100cm', 'SoilM_100_200cm', 'SoilM_0_100cm', 'SoilM_0_200cm', 'RootMoist', 'SMLiq_0_10cm', 'SMLiq_10_40cm', 'SMLiq_40_100cm', 'SMLiq_100_200cm',
+           'SMAvail_0_100cm', 'SMAvail_0_200cm', 'PotEvap', 'ECanop', 'TVeg', 'ESoil', 'SubSnow', 'CanopInt', 'ACond', 'CCond', 'RCS', 'RCT', 'RCQ', 'RCSOL', 'RSmin','RSMacr', 'LAI', 'GVEG', 'Streamflow']
+
 
 schemat = StructType()
-for i in sampled.columns:
+for i in columns:
   if i == "Date":
     schemat = schemat.add(i, StringType(), True)
   else:
@@ -44,8 +48,7 @@ Po wczytaniu danych usuniemy kolumny, które nie będą nam potrzebne przy anali
 """
 
 # usuwamy z danych kolumny odpowiadające za długość i szerokość geograficzną oraz datę
-columns_to_delete = ['lon', 'lat', 'Date']
-nasa = nasa.drop(*columns_to_delete)
+nasa = nasa.drop(*['lon', 'lat', 'Date'])
 nasa.show(5)
 
 
@@ -69,6 +72,7 @@ corr_matrix_pd = pd.DataFrame(np.array(corr_matrix.collect()[0][0].toArray()), c
 # aby po kliknięciu na grafikę ulegała ona przybliżeniu i wyostrzeniu
 
 def heatmap_plot(corr_matrix_pd):
+
   corr_matrix_np = corr_matrix_pd.to_numpy()
   print(plt.get_backend())
 
@@ -88,7 +92,9 @@ def heatmap_plot(corr_matrix_pd):
 
   ax.set_title('correlation matrix')
   plt.tight_layout()
-  plt.savefig("corr_matrix_incl_anno_double.png", dpi=300)
+  plt.savefig("corr_matrix.png", dpi=300)
+
+  files.download("corr_matrix.png")
 
 
 heatmap_plot(corr_matrix_pd)
