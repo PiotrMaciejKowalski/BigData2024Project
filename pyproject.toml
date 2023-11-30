@@ -1,0 +1,7 @@
+[tool.poetry]
+name = "big_mess"
+version = "0.1.0"
+description = ""
+authors = []
+readme = "README.md"
+packages = [{include = "big_mess", from = 'src'},]
