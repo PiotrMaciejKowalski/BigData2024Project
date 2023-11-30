@@ -2,12 +2,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-
+from google.colab import drive
+drive.mount("/content/drive")
 
 NASA = pd.read_csv('/content/drive/MyDrive/BigMess/NASA/sampled_NASA_200k.csv')
-
-
-NASA.head(5)
 
 
 print("Lon Range:", NASA['lon'].min(), NASA['lon'].max())
@@ -70,10 +68,6 @@ niepustynia_przy_GBD = NASA_lato[(NASA_lato['lon'] >= -124) & (NASA_lato['lon'] 
 # Wizualizacje + wstępne ustalenia parametrów
 """
 
-"""
-##### GVEG (wskaźnik roślinności)
-"""
-
 def plot_histogram(ax, data, column, title, color):
     ax.hist(data[column], bins=20, color=color, edgecolor="black")
     ax.set_title(title)
@@ -85,6 +79,11 @@ def plot_histogram(ax, data, column, title, color):
                 max(max(CD[column]), max(CD_i_niepustynia[column]), max(niepustynia_przy_CD[column]),
                     max(CP[column]), max(CP_i_niepustynia[column]), max(niepustynia_przy_CP[column]),
                     max(GBD[column]), max(GBD_i_niepustynia[column]), max(niepustynia_przy_GBD[column])))
+
+
+"""
+##### GVEG (wskaźnik roślinności)
+"""
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
@@ -103,6 +102,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'GVEG', "GBD_nie-pustynia", "gr
 plt.tight_layout()
 plt.show()
 
+first_quartiles_GVEG = (niepustynia_przy_CD['GVEG'].quantile(0.25), niepustynia_przy_CP['GVEG'].quantile(0.25), niepustynia_przy_GBD['GVEG'].quantile(0.25))
+
+print("first_quartiles:", first_quartiles_GVEG)
+
+third_quartiles_GVEG = (CD['GVEG'].quantile(0.75), CP['GVEG'].quantile(0.75), GBD['GVEG'].quantile(0.75))
+
+print("third_quartiles:", third_quartiles_GVEG)
 
 GVEG_graniczne = round(
     pd.Series([
@@ -140,6 +146,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'Rainf', "GBD_nie-pustynia", "g
 plt.tight_layout()
 plt.show()
 
+first_quartiles_Rainf = (CD_i_niepustynia['Rainf'].quantile(0.25), CP_i_niepustynia['Rainf'].quantile(0.25), GBD_i_niepustynia['Rainf'].quantile(0.25))
+
+print("first_quartiles:", first_quartiles_Rainf)
+
+third_quartiles_Rainf = (CD_i_niepustynia['Rainf'].quantile(0.75), CP_i_niepustynia['Rainf'].quantile(0.75), GBD_i_niepustynia['Rainf'].quantile(0.75))
+
+print("third_quartiles:", third_quartiles_Rainf)
 
 Rainf_graniczne = round(
     pd.Series([
@@ -177,6 +190,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'Evap', "GBD_nie-pustynia", "gr
 plt.tight_layout()
 plt.show()
 
+first_quartiles_Evap = (niepustynia_przy_CD['Evap'].quantile(0.25), niepustynia_przy_CP['Evap'].quantile(0.25), niepustynia_przy_GBD['Evap'].quantile(0.25))
+
+print("first_quartiles:", first_quartiles_Evap)
+
+third_quartiles_Evap = (CD['Evap'].quantile(0.75), CP['Evap'].quantile(0.75), GBD['Evap'].quantile(0.75))
+
+print("third_quartiles:", third_quartiles_Evap)
 
 Evap_graniczne = round(
     pd.Series([
@@ -214,6 +234,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'AvgSurfT', "GBD_nie-pustynia",
 plt.tight_layout()
 plt.show()
 
+first_quartiles_AvgSurfT = (CD['AvgSurfT'].quantile(0.25), CP['AvgSurfT'].quantile(0.25), GBD['AvgSurfT'].quantile(0.25))
+
+print("first_quartiles:", first_quartiles_AvgSurfT)
+
+third_quartiles_AvgSurfT = (niepustynia_przy_CD['AvgSurfT'].quantile(0.75), niepustynia_przy_CP['AvgSurfT'].quantile(0.75), niepustynia_przy_GBD['AvgSurfT'].quantile(0.75))
+
+print("third_quartiles:", third_quartiles_AvgSurfT)
 
 AvgSurfT_graniczne = round(
     pd.Series([
@@ -250,6 +277,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'Albedo', "GBD_nie-pustynia", "
 plt.tight_layout()
 plt.show()
 
+first_quartiles_Albedo = (CD['Albedo'].quantile(0.25), CP['Albedo'].quantile(0.25), GBD['Albedo'].quantile(0.25))
+
+print("first_quartiles:", first_quartiles_Albedo)
+
+third_quartiles_Albedo = (niepustynia_przy_CD['Albedo'].quantile(0.75), niepustynia_przy_CP['Albedo'].quantile(0.75), niepustynia_przy_GBD['Albedo'].quantile(0.75))
+
+print("third_quartiles:", third_quartiles_Albedo)
 
 Albedo_graniczne = round(
     pd.Series([
@@ -287,6 +321,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'SoilT_40_100cm', "GBD_nie-pust
 plt.tight_layout()
 plt.show()
 
+first_quartiles_SoilT_40_100cm = (CD['SoilT_40_100cm'].quantile(0.25), CP['SoilT_40_100cm'].quantile(0.25), GBD['SoilT_40_100cm'].quantile(0.25))
+
+print("first_quartiles:", first_quartiles_SoilT_40_100cm)
+
+third_quartiles_SoilT_40_100cm = (niepustynia_przy_CD['SoilT_40_100cm'].quantile(0.75), niepustynia_przy_CP['SoilT_40_100cm'].quantile(0.75), niepustynia_przy_GBD['SoilT_40_100cm'].quantile(0.75))
+
+print("third_quartiles:", third_quartiles_SoilT_40_100cm)
 
 SoilT_40_100cm_graniczne = round(
     pd.Series([
