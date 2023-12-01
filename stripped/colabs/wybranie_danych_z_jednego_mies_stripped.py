@@ -23,10 +23,6 @@ from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
 import pandas as pd
 
 
-from pyspark.sql import Window
-from pyspark.sql.functions import row_number
-
-
 """
 # Wczytanie zbioru danych
 """
@@ -42,7 +38,7 @@ drive.mount('/content/drive')
 
 
 # Wczytanie zbioru sampled w celu pobrania nazw kolumn
-sampled = pd.read_csv('/content/drive/MyDrive/sampled_NASA_200k.csv')
+sampled = pd.read_csv('/content/drive/MyDrive/BigMess/NASA/sampled_NASA_200k.csv')
 
 # Utworzenie schematu określającego typ zmiennych
 schemat = StructType()
@@ -54,47 +50,48 @@ for i in sampled.columns:
 
 
 # Wczytanie zbioru Nasa w sparku
-nasa = spark.read.format('csv').option("header", True).schema(schemat).load('/content/drive/MyDrive/NASA.csv')
+nasa = spark.read.format('csv').option("header", True).schema(schemat).load('/content/drive/MyDrive/BigMess/NASA/NASA.csv')
 nasa.show(5)
 
 
 nasa.createOrReplaceTempView("nasa")
 
 
-"""
-Na potrzeby przedstawienia danych na mapie zostawimy jedynie dane z grudnia 2022 roku.
-"""
-
-nasa_dec22 = spark.sql("""
+nasa = spark.sql("""
     SELECT
         CAST(SUBSTRING(CAST(Date AS STRING), 1, 4) AS INT) AS Year,
         CAST(SUBSTRING(CAST(Date AS STRING), 5, 2) AS INT) AS Month,
         n.*
     FROM nasa n
-    WHERE CAST(SUBSTRING(CAST(Date AS STRING), 1, 4) AS INT) = 2022
-      AND CAST(SUBSTRING(CAST(Date AS STRING), 5, 2) AS INT) = 12
-""")
+    """)
 
 
-nasa_dec22 = nasa_dec22.drop("Date")
-nasa_dec22.show(5)
-
-
-"""
-Zostawmy tylko unikatowe lokalizacje, tj. unikatowe pary wartości lon i lat:
-"""
-
-window_spec = Window.partitionBy('lon', 'lat').orderBy('lon', 'lat')
-# numerujemy, który raz z kolei dana lokalizacja pojawia się w zbiorze
-nasa_dec22_with_loc_row_num = nasa_dec22.withColumn('row_num', row_number().over(window_spec))
-nasa_dec22_loc = nasa_dec22_with_loc_row_num.filter('row_num = 1').drop('row_num')
+nasa = nasa.drop("Date")
+nasa.show(5)
 
 
 """
-I przenieśmy się na pandas, zapisując od razu wydzielony z oryginalnych danych podzbiór:
+Na potrzeby przedstawienia danych na mapie zostawimy jedynie dane z grudnia 2022 roku.
+"""
+
+nasa_dec22_loc = nasa.where((nasa.Year==2022) & (nasa.Month==12))
+
+
+"""
+I przenieśmy się na pandas, zapisując od razu wydzielony z oryginalnych danych podzbiór, upewniając się uprzednio czy w zbiorze są tylko unikatowe lokalizacje, tj. unikatowe pary wartości lon i lat:
 """
 
 nasa_dec22_loc = nasa_dec22_loc.toPandas()
-nasa_dec22_loc.to_csv('/content/drive/MyDrive/nasa_dec22_loc.csv', index=False)
+
+
+nasa_dec22_loc = nasa_dec22_loc.groupby(['lon', 'lat']).size().reset_index(name='count')
+max_count = nasa_dec22_loc['count'].max()
+max_count
+
+
+nasa_dec22_loc = nasa_dec22_loc.drop('count', axis=1)
+
+
+nasa_dec22_loc.to_csv('/content/drive/MyDrive/BigMess/NASA/nasa_dec22_loc.csv', index=False)
 
 
