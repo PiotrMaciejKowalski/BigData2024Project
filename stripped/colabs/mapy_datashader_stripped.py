@@ -136,3 +136,5 @@ map_with_points_gts_AvgSurfT.opts(bgcolor='white')
 hv.save(map_with_points_gts_AvgSurfT.opts(width=900, height=600, bgcolor='white', xaxis=None, yaxis=None), 'output_map_osm_AvgSurfT.html')
 
 
+
+

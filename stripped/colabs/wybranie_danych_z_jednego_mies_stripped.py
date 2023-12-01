@@ -98,5 +98,3 @@ nasa_dec22_loc = nasa_dec22_loc.toPandas()
 nasa_dec22_loc.to_csv('/content/drive/MyDrive/nasa_dec22_loc.csv', index=False)
 
 
-
-
