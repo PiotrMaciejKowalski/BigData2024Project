@@ -122,5 +122,3 @@ colormap_AvgSurfT = 'cet_rainbow_bgyr_10_90_c83'
 plot_map(df=df, parameter_name='AvgSurfT', colormap=colormap_AvgSurfT, point_size=5, alpha=0.7)
 
 
-
-

@@ -95,3 +95,5 @@ nasa_dec22_loc = nasa_dec22_loc.drop('count', axis=1)
 nasa_dec22_loc.to_csv('/content/drive/MyDrive/BigMess/NASA/nasa_dec22_loc.csv', index=False)
 
 
+
+
