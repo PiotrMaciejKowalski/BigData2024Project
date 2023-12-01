@@ -1,7 +1,7 @@
 #Wymagane: utworzone środowisko pyspark, sesja spark oraz połaczenie z dyskiem
-import pandas as pd
 from typing import Optional
 from functools import reduce
+import pandas as pd
 from pyspark.sql import SparkSession
 from pyspark.sql import DataFrame as SparkDataFrame
 
@@ -24,7 +24,7 @@ class City_Geolocalization_Data():
     self.geodata.rename(columns = {'miasto':'City', 'stan':'State', 'panstwo':'Country'}, inplace = True)
   
     duplicate_values = self.geodata[['lon','lat']].duplicated()
-    assert not reduce(lambda x, y: True if x or y else False, duplicate_values.tolist())
+    assert not reduce(lambda x, y: x or y, duplicate_values.tolist())
 
   def get_cityname(
       self,
@@ -43,15 +43,9 @@ class City_Geolocalization_Data():
     country: Optional[bool] = False
     ) -> pd.DataFrame:
     columns = ['lon', 'lat']
-    if city: 
-      columns.append('City') 
-      assert "City" in self.geodata.columns
-    if state: 
-      columns.append('State')
-      assert "State" in self.geodata.columns
-    if country: 
-      columns.append('Country')
-      assert "Country" in self.geodata.columns
+    if city: columns.append('City') 
+    if state: columns.append('State')
+    if country: columns.append('Country')
     return self.geodata[columns]
   
   def spark_add_geodata(
