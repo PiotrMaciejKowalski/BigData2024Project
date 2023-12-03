@@ -1,4 +1,4 @@
-# **Metryki**
+8# **Metryki**
 
 ## **1. Metryki dla modelu klasyfikacji terenu (pustynia/nie-pustynia)**
 
@@ -7,7 +7,7 @@ Ustalamy następującą hierarchię metryk:
 
 * Precision-Recall Curve (AUC-PR score)
 * Jaccard Index
-* AUC-ROC curve
+* AUC-ROC Curve
 
 Więcej informacji na temat tych metryk: 
 [LINK](https://medium.com/@douglaspsteen/precision-recall-curves-d32e5b290248)
@@ -17,5 +17,7 @@ Więcej informacji na temat tych metryk:
 
 ##  2. Metryki dla modelu predykcji 
 
- * ROC curve
+ * ROC Curve
  * Precision-Recall Curve
+
+Informacje na temat ROC Curve: [LINK](https://medium.com/analytics-vidhya/what-is-roc-curve-1f776103c998)
