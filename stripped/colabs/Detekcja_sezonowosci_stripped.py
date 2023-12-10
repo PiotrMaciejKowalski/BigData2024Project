@@ -209,24 +209,41 @@ def fit_linear_model_and_plot_predictions(df: pd.DataFrame, attribute: str, year
   df_pd = df.copy(deep=True)
   # Dummy encoding
   df_pd = pd.get_dummies(df, columns = ['Month'])
-  # Stworzenie zbioru treningowego i testowego
-  train_data =  df_pd.loc[df_pd['Year'] < year_split]
-  test_data = df_pd.loc[df_pd['Year'] >= year_split]
-  # Trening modelu
+  # Podział na zbiór treningowy i testowy
+  def train_test_split(df: pd.DataFrame, year_split: int) -> None:
+    """
+    Funckja dzieli ramke danych na zbiór treningowy i testowy.
+    - df (Pandas DataFrame): ramka danych w Pandas zawierająca co najmniej następujace kolumny: Year, Month, atrybut,
+    - year_split (int): rok rozdzielający zbiór treningowy i testowy.
+    """
+    train_data =  df.loc[df['Year'] < year_split]
+    test_data = df.loc[df['Year'] >= year_split]
+    return train_data, test_data
+  train_data, test_data = train_test_split(df_pd, year_split)
+  #Trenowanie modelu
   regression = LinearRegression().fit(train_data.iloc[:,-12:], train_data[attribute])
-  # Test modelu i wyświetlenie wyników
+  #Predykcja modelem
   df_pred = regression.predict(test_data.iloc[:,-12:])
-  test_data['prediction'] = df_pred
+  #Wypisanie metryk
   print(f"Mean squared error: {round(mean_squared_error(test_data[attribute], df_pred),3)}")
-  print(f"Coefficient of determination: {round(r2_score(test_data[attribute], df_pred),3)}" )
-  # Tworzenie wykresu predykcji
-  plt.figure(figsize=(7, 4), dpi=100)
-  test_data[attribute].plot(label=f'Prawdziwa wartość {attribute}', color='green')
-  test_data['prediction'].plot(label='Predykcja modelu', color='purple')
-  plt.title(f'Model regresji liniowej dla {attribute}')
-  plt.xlabel('Data')
-  plt.ylabel(attribute)
-  plt.legend(loc='upper left')
+  print(f"Coefficient of determination: {round(r2_score(test_data[attribute], df_pred),3)}")
+  #Stworzenie wykresu
+  def plot_predictions(test_data: pd.DataFrame, test_pred: pd.DataFrame, attribute: str) -> None:
+    """
+    Funkcja tworzy wykres predykcji modelu i prawdziwych wartości.
+    Parametry:
+    - test_data (Pandas DataFrame): zbiór testowy, który zawiera badany atrybut,
+    - test_pred (Pandas DataFrame): zbiór zawierające predykcje modelu,
+    - attribute (str): nazwa kolumny będąca zmienną zależną (dependent variable).
+    """
+    plt.figure(figsize=(7, 4), dpi=100)
+    test_data[attribute].plot(label=f'Prawdziwa wartość {attribute}', color='green')
+    plt.plot(test_data[attribute].index, test_pred, label='Predykcja modelu', color='purple')
+    plt.title(f'Model regresji liniowej dla {attribute}')
+    plt.xlabel('Data')
+    plt.ylabel(attribute)
+    plt.legend(loc='upper left')
+  plot_predictions(test_data, df_pred, attribute)
 
 
 def fit_sarima_and_plot_predictions(df: pd.DataFrame, attribute: str, year_split: int, p:int, d:int, q:int, P:int, D:int, Q:int, s:int) -> None:
@@ -241,32 +258,79 @@ def fit_sarima_and_plot_predictions(df: pd.DataFrame, attribute: str, year_split
   """
   assert attribute in df.columns, f"The attribute '{attribute}' is not a column in the DataFrame."
   # Stworzenie zbioru treningowego i testowego
-  train_data =  df.loc[df['Year'] < year_split]
-  test_data = df.loc[df['Year'] >= year_split]
-  # Trening modelu
+  def train_test_split(df: pd.DataFrame, year_split: int) -> None:
+    """
+    Funckja dzieli ramke danych na zbiór treningowy i testowy.
+    - df (Pandas DataFrame): ramka danych w Pandas zawierająca co najmniej następujace kolumny: Year, Month, atrybut,
+    - year_split (int): rok rozdzielający zbiór treningowy i testowy.
+    """
+    train_data =  df.loc[df['Year'] < year_split]
+    test_data = df.loc[df['Year'] >= year_split]
+    return train_data, test_data
+  train_data, test_data = train_test_split(df, year_split)
+  # Sprawdzenie stacjonarności przy użyciu funkcji perform_augumented_dickey_fuller_print_result
   if perform_augumented_dickey_fuller_print_result(df, attribute, False) == "Stationary":
     enforce_stat = False
   else:
     enforce_stat = True
-  sarima = SARIMAX(train_data[attribute],
+  # Trenowanie modelu
+  def train_model(train_df: pd.DataFrame, attribute: str, p:int, d:int, q:int, P:int, D:int, Q:int, s:int, enforce_stat: bool):
+    """
+    Funkcja, która trenuje model SARIMAX.
+    Parametry:
+    - train_df (Pandas DataFrame): zbiór treningowy,
+    - attribute (str): nazwa kolumny będąca zmienną zależną (dependent variable),
+    - year_split (int): rok rozdzielający zbiór treningowy i testowy,
+    - p, d, q (int): parametry funkcji SARIMAX, argumentu order,
+    - P, D, Q, s (int): parametry funkcji SARIMAX, argumantu seasonal_order,
+    - enforce_stat (bool): parametr determinujący argument enforce_stationarity funkcji SARIMAX.
+    """
+    sarima = SARIMAX(train_df[attribute],
                 order=(p,d,q),
                 seasonal_order=(P,D,Q,s),
                 trend="ct",
                 enforce_stationarity=enforce_stat).fit()
+    return sarima
+  sarima = train_model(train_data, attribute, p, d, q, P, D, Q, s, enforce_stat)
   # Test modelu i wyświetlenie wyników
-  df_pred = sarima.predict(start= str(year_split) + "-01-01", end="2023-09-01", steps=len(test_data))
-  test_data['prediction'] = df_pred
-  print(f"Mean squared error: {round(mean_squared_error(test_data[attribute], df_pred),3)}")
-  print(f"Coefficient of determination: {round(r2_score(test_data[attribute], df_pred),3)}" )
+  def model_predict(model, year_split: int):
+    """
+    Funkcja dokonuje predykcji za pomocą wczytanego modelu począwszy od pierwszego stycznia roku year_split do 2023-09-01.
+    - model: model za pomocą, którego dokonujemy predykcji,
+    - year_split (int): rok rozdzielający zbiór treningowy i testowy.
+    """
+    df_pred = model.predict(start= str(year_split) + "-01-01", end="2023-09-01", steps=len(test_data))
+    return df_pred
+  df_pred = model_predict(sarima, year_split)
+  # Wyświetlenie metryk
+  def print_mean_squerd_error_and_r2_score(test_df: pd.DataFrame, test_pred: pd.DataFrame, attribute: str) -> None:
+    """
+    Funkcja wyświetlająca błąd średniokwadratowy oraz współczynnik determinacji.
+    - test_df (Pandas DataFrame): zbiór testowy,
+    - test_pred (Pandas DataFrame): zbiór zawierające predykcje modelu,
+    - attribute (str): nazwa kolumny będąca zmienną zależną (dependent variable).
+    """
+    print(f"Mean squared error: {round(mean_squared_error(test_df[attribute], test_pred),3)}")
+    print(f"Coefficient of determination: {round(r2_score(test_df[attribute], test_pred),3)}")
+  print_mean_squerd_error_and_r2_score(test_data, df_pred, attribute)
   # Tworzenie wykresu predykcji
-  plt.figure(figsize=(7, 4), dpi=100)
-  test_data[attribute].plot(label=f'Prawdziwa wartość {attribute}', color='green')
-  test_data['prediction'].plot(label='Predykcja modelu', color='purple')
-  plt.title(f'Model regresji liniowej dla {attribute}')
-  plt.xlabel('Data')
-  plt.ylabel(attribute)
-  plt.legend(loc='upper left')
-  plt.show()
+  def plot_predictions(test_data: pd.DataFrame, test_pred: pd.DataFrame, attribute: str) -> None:
+    """
+    Funkcja tworzy wykres predykcji modelu i prawdziwych wartości.
+    Parametry:
+    - test_data (Pandas DataFrame): zbiór testowy, który zawiera badany atrybut,
+    - test_pred (Pandas DataFrame): zbiór zawierające predykcje modelu,
+    - attribute (str): nazwa kolumny będąca zmienną zależną (dependent variable).
+    """
+    plt.figure(figsize=(7, 4), dpi=100)
+    test_data[attribute].plot(label=f'Prawdziwa wartość {attribute}', color='green')
+    plt.plot(test_data[attribute].index, test_pred, label='Predykcja modelu', color='purple')
+    plt.title(f'Model regresji liniowej dla {attribute}')
+    plt.xlabel('Data')
+    plt.ylabel(attribute)
+    plt.legend(loc='upper left')
+    plt.show()
+  plot_predictions(test_data, df_pred, attribute)
 
 
 def plot_variable_to_check_yearly_seasonality(df: pd.DataFrame, attribute: str) -> None:
@@ -330,9 +394,11 @@ def plot_acf_and_pacf(df: pd.DataFrame, attribute: str, lag: int) -> None:
   tsaplots.plot_acf(df[attribute], lags=lag, ax=ax[0])
   ax[0].set_xlabel('Lag at k')
   ax[0].set_ylabel('Correlation coefficient')
+  ax[0].set_title("Wykres autokorelacji")
   tsaplots.plot_pacf(df[attribute], lags=lag, ax=ax[1])
   ax[1].set_xlabel('Lag at k')
   ax[1].set_ylabel('Correlation coefficient')
+  ax[1].set_title("Wykres autokorelacji cząstkowej")
   plt.show()
 
 
@@ -368,7 +434,7 @@ src = "https://www.globalforestwatch.org/map/country/USA/?map=eyJjZW50ZXIiOnsibG
 IPython.display.IFrame(src, width=900, height=500)
 
 
-# Wybranie najlepszego punktu w danych do punktu (39.8405, -119,75805)
+# Wybranie punktu w danych, który jest blisko punktu (39.8405, -119,75805).
 distinct_wsp[(distinct_wsp['lon']<=-119.6) & (distinct_wsp['lon']>=-119.8) & (distinct_wsp['lat']<=40) & (distinct_wsp['lat']>=39.7)]
 
 
@@ -380,6 +446,14 @@ Weźmy punkt nr 76158.
 src = "https://www.globalforestwatch.org/map/country/USA/?map=eyJjZW50ZXIiOnsibGF0IjozOS43NzcwNzMwNzg3MDQ1NTQsImxuZyI6LTExOC41NDA0NTc4NDkzOTQ5M30sInpvb20iOjkuNzUzNjE5NzU1ODYzMTEsImNhbkJvdW5kIjpmYWxzZSwiZGF0YXNldHMiOlt7ImRhdGFzZXQiOiJwb2xpdGljYWwtYm91bmRhcmllcyIsImxheWVycyI6WyJkaXNwdXRlZC1wb2xpdGljYWwtYm91bmRhcmllcyIsInBvbGl0aWNhbC1ib3VuZGFyaWVzIl0sIm9wYWNpdHkiOjEsInZpc2liaWxpdHkiOnRydWV9LHsiZGF0YXNldCI6InRyZWUtY292ZXItZ2FpbiIsImxheWVycyI6WyJ0cmVlLWNvdmVyLWdhaW4tMjAwMS0yMDIwIl0sIm9wYWNpdHkiOjEsInZpc2liaWxpdHkiOnRydWV9LHsiZGF0YXNldCI6InRyZWUtY292ZXItbG9zcyIsImxheWVycyI6WyJ0cmVlLWNvdmVyLWxvc3MiXSwib3BhY2l0eSI6MSwidmlzaWJpbGl0eSI6dHJ1ZSwidGltZWxpbmVQYXJhbXMiOnsic3RhcnREYXRlIjoiMjAwMS0wMS0wMSIsImVuZERhdGUiOiIyMDIyLTEyLTMxIiwidHJpbUVuZERhdGUiOiIyMDIyLTEyLTMxIn19LHsiZGF0YXNldCI6InRyZWUtY292ZXIiLCJsYXllcnMiOlsidHJlZS1jb3Zlci0yMDEwIl0sIm9wYWNpdHkiOjEsInZpc2liaWxpdHkiOnRydWV9XX0%3D&mapMenu=eyJzZWFyY2hUeXBlIjoiZGVjaW1hbHMiLCJzZWFyY2giOiJDZW50cmFsIEJhc2luIGFuZCBSYW5nZSJ9&mapPrompts=eyJvcGVuIjp0cnVlLCJzdGVwc0tleSI6InJlY2VudEltYWdlcnkifQ%3D%3D"
 IPython.display.IFrame(src, width=900, height=500)
 
+
+# Wybranie punktu w danych, który jest blisko punktu (39.77707, -118.54046).
+distinct_wsp[(distinct_wsp['lon']<=-118.3) & (distinct_wsp['lon']>=-118.7) & (distinct_wsp['lat']<=39.9) & (distinct_wsp['lat']>=39.7)]
+
+
+"""
+Weźmy punkt nr 63828.
+"""
 
 """
 ## **Rainf** (wskaźnik opadów deszczu)
