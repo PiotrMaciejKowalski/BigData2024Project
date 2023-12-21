@@ -863,3 +863,5 @@ fit_linear_model_and_plot_predictions(GVEG_time_series_przejsciowe, 'GVEG', 2020
 plot_linear_and_polynomial_trend(GVEG_time_series_przejsciowe, 'GVEG', 5)
 
 
+
+
