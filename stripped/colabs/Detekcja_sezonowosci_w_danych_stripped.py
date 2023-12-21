@@ -192,9 +192,9 @@ def perform_augumented_dickey_fuller_print_result(df: pd.DataFrame, attribute: s
           print(f'{key}, {round(value,3)}')
 
     if (result[1] <= 0.05) & (result[4]['5%'] > result[0]):
-        return("Stationary")
+        return "Stationary"
     else:
-        return("Non-stationary")
+        return "Non-stationary"
 
 
 def plot_predictions(test_data: pd.DataFrame, test_pred: pd.DataFrame, attribute: str) -> None:
@@ -238,13 +238,13 @@ def fit_linear_model_and_plot_predictions(df: pd.DataFrame, attribute: str, year
   df_pd = df.copy(deep=True)
   # Dummy encoding
   df_pd = pd.get_dummies(df, columns = ['Month'])
+  dummies_columns = list(set(df_pd.columns) - set(df.columns))
   # Podział na zbiór treningowy i testowy
   train_data, test_data = train_test_split_by_year(df_pd, year_split)
   #Trenowanie modelu
-  #Ponieważ funckja pd.get_dummies tworzy 12 nowych kolumn, na podstawie których będziemy trenować nasz model, wybieramy je w sposób, który nie popsuje się przy zmiennej ilości kolumn w zbiorze df.
-  regression = LinearRegression().fit(train_data.iloc[:,-12:], train_data[attribute]) #FIXME zdecydowanie zła praktyka w kodzie. Naprawić przy pierwszej możliwość. NIE KOPIOWAĆ
+  regression = LinearRegression().fit(train_data[dummies_columns], train_data[attribute])
   #Predykcja modelem
-  df_pred = regression.predict(test_data.iloc[:,-12:])
+  df_pred = regression.predict(test_data[dummies_columns])
   #Wypisanie metryk
   print(f"Mean squared error: {round(mean_squared_error(test_data[attribute], df_pred),3)}")
   print(f"Coefficient of determination: {round(r2_score(test_data[attribute], df_pred),3)}")
@@ -861,7 +861,5 @@ fit_linear_model_and_plot_predictions(GVEG_time_series_przejsciowe, 'GVEG', 2020
 
 
 plot_linear_and_polynomial_trend(GVEG_time_series_przejsciowe, 'GVEG', 5)
-
-
 
 
