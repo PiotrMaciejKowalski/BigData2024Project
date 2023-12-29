@@ -22,7 +22,7 @@ findspark.init()
 
 from functools import reduce
 import math
-from typing import Optional, List, Tuple
+from typing import Optional, Tuple, List
 
 import pandas as pd
 import numpy as np
@@ -50,23 +50,21 @@ spark.conf.set('spark.sql.execution.arrow.enabled', 'true')
 drive.mount('/content/drive')
 
 
-# Wczytanie zbioru sampled w celu pobrania nazw kolumn
-sampled = pd.read_csv('/content/drive/MyDrive/BigMess/NASA/sampled_NASA_200k.csv')
+columns = ['lon', 'lat', 'Date', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo','SoilT_10_40cm', 'GVEG', 'PotEvap', 'RootMoist', 'SoilM_100_200cm']
 
 # Utworzenie schematu określającego typ zmiennych
-schemat = StructType()
-for i in sampled.columns:
+schema = StructType()
+for i in columns:
   if i == "Date":
-    schemat = schemat.add(i, IntegerType(), True)
+    schema = schema.add(i, IntegerType(), True)
   else:
-    schemat = schemat.add(i, FloatType(), True)
+    schema = schema.add(i, FloatType(), True)
 
 
 %%time
 # Wczytanie zbioru Nasa w sparku
-nasa = spark.read.format('csv').option("header", True).schema(schemat).load('/content/drive/MyDrive/BigMess/NASA/NASA.csv')
-nasa.show(5)
 
+nasa = spark.read.format('csv').option("header", True).schema(schema).load('/content/drive/MyDrive/BigMess/NASA/NASA.csv')
 nasa.createOrReplaceTempView("nasa")
 
 nasa = (
@@ -87,23 +85,24 @@ nasa_coords.collect()
 """
 
 # function searches for points that lie within a (euclidean) ball of size *radius* around the query points
-# if optional argument *k* is given then function searches for (at most) k nearest points that lie within
+# if optional argument *k* is given then function searches for at most k nearest points that lie within
 # a (euclidean) ball of size *radius* around the query points
 
 #point = (latitude, longitude)
-def kRadiusNN(df: SparkDataFrame, radius: float, point: Tuple[float, float], k: Optional[int]=None) -> pd.DataFrame :
+#df - Spark DataFrame collected in a list of Rows (in order to collect your DataFrame run: df.collect() )
+def kRadiusNN(df: List[Row], radius: float, point: Tuple[float, float], label_column_name: str, k: Optional[int]=None) -> pd.DataFrame :
   assert (25.0625<= point[0] <=52.9375) and (-124.9375<= point[1] <=-67.0625 ), 'Wrong coordinates (out of range)'
 
-  df = df.collect()
-  neighbours_pd = pd.DataFrame({"lon":[], "lat":[], 'dist':[]})
+  neighbours_pd = pd.DataFrame({"lon":[], "lat":[], 'dist':[], label_column_name: []})
 
   for row in df:
 
      lon = row['lon']
      lat = row['lat']
+     label = row[label_column_name]
      dist = geodesic((lat, lon), point).km
      if dist <= radius:
-        new_row = {'lon': lon , 'lat': lat, 'dist' : dist}
+        new_row = {'lon': lon , 'lat': lat, 'dist' : dist, label_column_name : label}
         neighbours_pd.loc[len(neighbours_pd)] = new_row
 
   if k and (k < len(neighbours_pd)):
@@ -114,35 +113,31 @@ def kRadiusNN(df: SparkDataFrame, radius: float, point: Tuple[float, float], k: 
       else:
          raise Exception("Unable to determine k nearest neighbours: more neighbours with the same distance")
 
+  if len(neighbours_pd) == 0:
+         raise Exception("No neighbours found within the given radius")
+
   return(neighbours_pd)
-
-
-kRadiusNN(nasa_coords, 20, (35, -110), 5)
 
 
 # weighted: if True then function will weight points by the inverse of their distance (in this case, closer neighbours of
 # a query point will have a greater influence than neighbors which are further away).
 
-def predict_class(df: SparkDataFrame, point: Tuple[float, float], radius: float, label_column_name: str,
-                  k: Optional[int]=None, weighted: Optional[bool]=False) -> bool :
+
+#point = (latitude, longitude)
+#df - Spark DataFrame collected in a list of Rows (in order to collect your DataFrame run: df.collect(), before applying function to your DataFrame)
+def predict_class(df: List[Row], point: Tuple[float, float], radius: float, label_column_name: str,
+                  k: Optional[int]=None, weighted: Optional[bool]=False) -> int :
  if k:
-    neighbours = kRadiusNN(df, radius, point, k)
+    neighbours = kRadiusNN(df, radius, point, label_column_name, k)
  else:
-    neighbours = kRadiusNN(df, radius, point)
-
- neighbours_rows = df.withColumn('neighbour', F.when( reduce (lambda cond1, cond2: (cond1) | (cond2),
-  [(F.col('lat') == neighbours.at[id, 'lat'])&(F.col('lon') == neighbours.at[id, 'lon'])
-  for id in neighbours.index]), 1).otherwise(0))
-
- neighbours_rows = neighbours_rows.filter('neighbour = 1').toPandas()
- neighbours_dist = pd.concat([neighbours_rows, neighbours], axis=1, join="inner")
+    neighbours = kRadiusNN(df, radius, point, label_column_name)
 
 
  if weighted:   #weighted nearest neighbours
-    neighbours_dist['dist'] = neighbours_dist['dist'].map(lambda x: 1/x)
+    neighbours['dist'] = neighbours['dist'].map(lambda x: 1/x)
 
-    label0 = neighbours_dist[neighbours_dist[label_column_name]==0]
-    label1 = neighbours_dist[neighbours_dist[label_column_name]==1]
+    label0 = neighbours[neighbours[label_column_name]==0]
+    label1 = neighbours[neighbours[label_column_name]==1]
 
     frequency0 = label0['dist'].sum()
     frequency1 = label1['dist'].sum()
@@ -151,10 +146,11 @@ def predict_class(df: SparkDataFrame, point: Tuple[float, float], radius: float,
 
 
  else:
-    if len(neighbours_dist[label_column_name].mode()) > 1:    #this is only possible when the number of neighbours is an even number (since we perform binary classification)
+
+    if len(neighbours[label_column_name].mode()) > 1:    #this is only possible when the number of neighbours is an even number (since we perform binary classification)
        raise Exception("Unable to predict the label: we have a tie, there is no clear winner in the majority voting")
     else:
-      predicted_label = neighbours_dist[label_column_name].mode().iat[0]
+      predicted_label = neighbours[label_column_name].mode().iat[0]
 
     return predicted_label
 
@@ -166,12 +162,28 @@ Wygenerujemy w sposób sztuczny etykiety dla zbioru w celu przetestowania funkcj
 df = nasa_coords.withColumn('label', (F.col('lat').cast('int'))%2)
 
 
-df.show(10)
+df = df.collect()
 
 
-predict_class(df, (40.5, -110), 20, "label", k=None, weighted=True)
+%%time
+predict_class(df, (40.5, -95), 18, "label", k=8, weighted=True)
 
 
-predict_class(df, (40.5, -110), 20, "label", k=None, weighted=False)
+%%time
+predict_class(df, (29.5, -92), 20, "label", k=None, weighted=False)
+
+
+%%time
+predict_class(df, (31.5, -112), 20, "label", k=8, weighted=True)
+
+
+%%time
+predict_class(df, (40.5, -95), 18, "label", k=8, weighted=True)
+
+
+%%time
+predict_class(df, (49.375, -80.125), 15, "label", k=8, weighted=True)
+
+
 
 
