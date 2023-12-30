@@ -1,2 +1,6 @@
 pre-commit
 jupyter
+numpy
+sklearn
+pandas
+pyspark
