@@ -53,5 +53,3 @@ nasa = spark.sql("""
 
 nasa = nasa.drop("Date")
 nasa.show(5)
-
-3+3
