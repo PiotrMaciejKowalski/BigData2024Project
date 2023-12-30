@@ -23,8 +23,6 @@ for file in "${files[@]}" ; do
         target_stripped_file="${stripped_dir}/${filename%.ipynb}_stripped.py"
 
         jupyter nbconvert --to script $file
-        echo -e "Filename $filename"
-        echo -e "Filename ${filename%.ipynb}"
         mv ${file%.ipynb}.txt $target_stripped_file
 		
         if [  "$should_git_add" == true ]; then 
