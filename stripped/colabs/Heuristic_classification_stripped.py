@@ -41,5 +41,3 @@ result = heuristic_classify(data)
 result.show(20)
 
 save_to_csv(result.drop("Rainf_condition","Evap_condition","GVEG_condition","AvgSurfT_condition","Albedo_condition","conditions_fullfiled_sum"), '/content/drive/MyDrive/BigMess/NASA/NASA_heuristic.csv')
-
-2+2
