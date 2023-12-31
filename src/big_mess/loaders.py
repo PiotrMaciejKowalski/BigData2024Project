@@ -22,8 +22,20 @@ def default_loader(spark: SparkSession, file_path: Optional[str] = None ) -> Spa
         sdf
         .withColumn('Year', sdf['Date'].substr(1, 4).cast('int'))
         .withColumn('Month', sdf['Date'].substr(5, 2).cast('int'))
-        .select([F.col(column) for column in sdf.columns if column != 'Date'])
+        .drop('Date')
         )
+
+
+def load_single_month(spark: SparkSession, file_path: Optional[str] = None) -> SparkDataFrame:
+    data = default_loader(spark, file_path)
+    return data.filter('Year = 2023').filter('Month = 1')
+
+def load_anotated(spark: SparkSession, file_path: Optional[str] = None, anotatation_path: Optional[str] = None ) -> SparkDataFrame:
+    data = load_single_month(spark, file_path)
+    if anotatation_path is None:
+        anotatation_path = '/content/drive/MyDrive/BigMess/NASA/NASA_an.csv'
+    annotations = spark.read.format('csv').option("header", True).option("inferSchema", "true").option("delimiter", ";").load(anotatation_path)
+    return data.join(annotations, on = ['lon', 'lat'], how='inner')
     
 
 def save_to_csv(sdf: SparkDataFrame, output_path: str) -> None:
