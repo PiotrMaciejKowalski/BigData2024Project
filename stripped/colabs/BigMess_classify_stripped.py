@@ -78,5 +78,3 @@ classification_rep = classification_report(y_test, y_pred)
 print(f"Accuracy: {accuracy}")
 print("Classification Report:")
 print(classification_rep)
-
-2+2
