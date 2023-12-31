@@ -18,7 +18,7 @@ initialize_spark()
 import pandas as pd
 from pyspark.sql import SparkSession
 
-from big_mess.loaders import default_loader, save_to_csv
+from big_mess.loaders import default_loader, load_single_month, load_anotated, save_to_csv
 
 spark = SparkSession.builder\
         .master("local")\
@@ -26,8 +26,22 @@ spark = SparkSession.builder\
         .config('spark.ui.port', '4050')\
         .getOrCreate()
 
-nasa = default_loader(spark)
+%%time
+nasa_full = default_loader(spark)
+nasa_full.count()
 
-save_to_csv(nasa, '/content/drive/MyDrive/BigMess/NASA/NASA_preprocessed.csv')
+save_to_csv(nasa_full, '/content/drive/MyDrive/BigMess/NASA/NASA_full_preprocessed.csv')
 
+%%time
+nasa_single_month = load_single_month(spark)
+nasa_single_month.count()
 
+save_to_csv(nasa_single_month, '/content/drive/MyDrive/BigMess/NASA/NASA_month_preprocessed.csv')
+
+%%time
+nasa_anotated = load_anotated(spark)
+nasa_anotated.count()
+
+save_to_csv(nasa_anotated, '/content/drive/MyDrive/BigMess/NASA/NASA_anotated_preprocessed.csv')
+
+2+2
