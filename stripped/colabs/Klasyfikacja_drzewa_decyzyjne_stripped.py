@@ -274,7 +274,7 @@ Obliczmy korelacje zmiennych.
 
 correlations(X_m1_train)
 
-"""Usuniecie zmiennych *SoilM_100_200cm* i *PotEvap*. Cechuja sie one mała wartoscia zysku informacji. (Accurancy z tymi zmiennymi 81% dla zbioru testowego, 70% dla zbalansowanego zbioru testowego.)"""
+"""Usuniecie zmiennych *SoilM_100_200cm* i *PotEvap*. Cechuja sie one mała wartoscia zysku informacji. (Accurancy z tymi zmiennymi 81% dla zbioru testowego.)"""
 
 X_m1_train = X_m1_train.drop('SoilM_100_200cm',axis=1)
 X_m1_test = X_m1_test.drop('SoilM_100_200cm',axis=1)
@@ -289,8 +289,6 @@ X_m1_train_bal, y_m1_train_bal = BalanceDataSet(X_m1_train, y_m1_train).useSMOTE
 
 plot_data_dist(y_m1_train_bal)
 
-X_m1_test_bal, y_m1_test_bal = BalanceDataSet(X_m1_test, y_m1_test).useSMOTE()
-
 """#### Drzewa decyzyjne"""
 
 tree_classifier_m1 = tree.DecisionTreeClassifier(random_state = 2023)
@@ -298,8 +296,6 @@ tree_classifier_m1 = tree.DecisionTreeClassifier(random_state = 2023)
 tree_classifier_m1.fit(X_m1_train_bal, y_m1_train_bal)
 
 print("classifier accuracy {:.2f}%".format(tree_classifier_m1.score(X_m1_test,  y_m1_test) * 100))
-
-print("classifier accuracy {:.2f}%".format(tree_classifier_m1.score(X_m1_test_bal, y_m1_test_bal) * 100))
 
 # Commented out IPython magic to ensure Python compatibility.
 # %matplotlib inline
@@ -309,18 +305,18 @@ tree.plot_tree(tree_classifier_m1, max_depth=3, feature_names=X_m1_train.columns
 
 """#### Ocena modelu
 
-Na danych testowych.
+Na zbalansowanych danych treningowych.
 """
+
+summary_model(tree_classifier_m1, X_m1_train_bal, y_m1_train_bal, ['1','2','3'])
+
+print_classification_report(tree_classifier_m1, X_m1_train_bal, y_m1_train_bal)
+
+"""Na danych testowych."""
 
 summary_model(tree_classifier_m1, X_m1_test, y_m1_test, ['1','2','3'])
 
 print_classification_report(tree_classifier_m1, X_m1_test, y_m1_test)
-
-"""Na zbalansowanych danych testowych."""
-
-summary_model(tree_classifier_m1, X_m1_test_bal, y_m1_test_bal, ['1','2','3'])
-
-print_classification_report(tree_classifier_m1, X_m1_test_bal, y_m1_test_bal)
 
 """#### Zapisanie modelu"""
 
@@ -350,7 +346,7 @@ Obliczmy korelacje zmiennych.
 
 correlations(X_m2_train)
 
-"""Usuniecie zmiennych *SoilM_100_200cm* i *PotEvap*. Cechuja sie one mała wartoscia zysku informacji. (Accurancy z tymi zmiennymi 94% dla zbioru testowego, 91% dla zbalansowanego zbioru testowego.)"""
+"""Usuniecie zmiennych *SoilM_100_200cm* i *PotEvap*. Cechuja sie one mała wartoscia zysku informacji. (Accurancy z tymi zmiennymi 94% dla zbioru testowego.)"""
 
 X_m2_train = X_m2_train.drop('SoilM_100_200cm',axis=1)
 X_m2_test = X_m2_test.drop('SoilM_100_200cm',axis=1)
@@ -365,8 +361,6 @@ X_m2_train_bal, y_m2_train_bal = BalanceDataSet(X_m2_train, y_m2_train).useSMOTE
 
 plot_data_dist(y_m2_train_bal)
 
-X_m2_test_bal, y_m2_test_bal = BalanceDataSet(X_m2_test, y_m2_test).useSMOTE()
-
 """#### Drzewa decyzyjne"""
 
 tree_classifier_m2 = tree.DecisionTreeClassifier(random_state = 2023)
@@ -374,8 +368,6 @@ tree_classifier_m2 = tree.DecisionTreeClassifier(random_state = 2023)
 tree_classifier_m2.fit(X_m2_train_bal, y_m2_train_bal)
 
 print("classifier accuracy {:.2f}%".format(tree_classifier_m2.score(X_m2_test,  y_m2_test) * 100))
-
-print("classifier accuracy {:.2f}%".format(tree_classifier_m2.score(X_m2_test_bal, y_m2_test_bal) * 100))
 
 # Commented out IPython magic to ensure Python compatibility.
 # %matplotlib inline
@@ -385,18 +377,18 @@ tree.plot_tree(tree_classifier_m2, max_depth=3, feature_names=X_m2_train.columns
 
 """#### Ocena modelu
 
-Na danych testowych.
+Na zbalansowanych danych treningowych.
 """
 
-summary_model(tree_classifier_m2, X_m2_test, y_m2_test, ['1', '2'])
+summary_model(tree_classifier_m2, X_m2_train_bal, y_m2_train_bal, ['0', '1'])
+
+print_classification_report(tree_classifier_m2, X_m2_train_bal, y_m2_train_bal)
+
+"""Na danych testowych."""
+
+summary_model(tree_classifier_m2, X_m2_test, y_m2_test, ['0', '1'])
 
 print_classification_report(tree_classifier_m2, X_m2_test, y_m2_test)
-
-"""Na zbalansowanych danych testowych."""
-
-summary_model(tree_classifier_m2, X_m2_test_bal, y_m2_test_bal, ['1', '2'])
-
-print_classification_report(tree_classifier_m2, X_m2_test_bal, y_m2_test_bal)
 
 """#### Zapisanie modelu"""
 
@@ -426,7 +418,7 @@ Obliczmy korelacje zmiennych.
 
 correlations(X_m3_train)
 
-"""Usuniecie zmiennych *SoilM_100_200cm*, *SoilT_10_40cm*, *AvgSurfT* i *PotEvap*. Cechuja sie one mała wartoscia zysku informacji. (Accurancy z tymi zmiennymi 82% dla zbioru testowego, 79% dla zbalansowanego zbioru testowego.)"""
+"""Usuniecie zmiennych *SoilM_100_200cm*, *SoilT_10_40cm*, *AvgSurfT* i *PotEvap*. Cechuja sie one mała wartoscia zysku informacji. (Accurancy z tymi zmiennymi 82% dla zbioru testowego.)"""
 
 X_m3_train = X_m3_train.drop('SoilM_100_200cm',axis=1)
 X_m3_test = X_m3_test.drop('SoilM_100_200cm',axis=1)
@@ -445,8 +437,6 @@ X_m3_train_bal, y_m3_train_bal = BalanceDataSet(X_m3_train, y_m3_train).useSMOTE
 
 plot_data_dist(y_m3_train_bal)
 
-X_m3_test_bal, y_m3_test_bal = BalanceDataSet(X_m3_test, y_m3_test).useSMOTE()
-
 """#### Drzewa decyzyjne"""
 
 tree_classifier_m3 = tree.DecisionTreeClassifier(random_state = 2023)
@@ -454,8 +444,6 @@ tree_classifier_m3 = tree.DecisionTreeClassifier(random_state = 2023)
 tree_classifier_m3.fit(X_m3_train_bal, y_m3_train_bal)
 
 print("classifier accuracy {:.2f}%".format(tree_classifier_m3.score(X_m3_test,  y_m3_test) * 100))
-
-print("classifier accuracy {:.2f}%".format(tree_classifier_m3.score(X_m3_test_bal, y_m3_test_bal) * 100))
 
 # Commented out IPython magic to ensure Python compatibility.
 # %matplotlib inline
@@ -465,18 +453,18 @@ tree.plot_tree(tree_classifier_m3, max_depth=3, feature_names=X_m3_train.columns
 
 """#### Ocena modelu
 
-Na danych testowych.
+Na zbalansowanych danych treningowych.
 """
 
-summary_model(tree_classifier_m3, X_m3_test, y_m3_test, ['1', '2'])
+summary_model(tree_classifier_m3, X_m3_train_bal, y_m3_train_bal, ['0', '1'])
+
+print_classification_report(tree_classifier_m3, X_m3_train_bal, y_m3_train_bal)
+
+"""Na danych testowych."""
+
+summary_model(tree_classifier_m3, X_m3_test, y_m3_test, ['0', '1'])
 
 print_classification_report(tree_classifier_m3, X_m3_test, y_m3_test)
-
-"""Na zbalansowanych danych testowych."""
-
-summary_model(tree_classifier_m3, X_m3_test_bal, y_m3_test_bal, ['0', '1'])
-
-print_classification_report(tree_classifier_m3, X_m3_test_bal, y_m3_test_bal)
 
 """#### Zapisanie modelu"""
 
