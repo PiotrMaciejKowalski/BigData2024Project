@@ -47,4 +47,12 @@ def save_to_csv(sdf: SparkDataFrame, output_path: str) -> None:
     - output_path: Output path for the CSV file
     """
     # Save the DataFrame to CSV
-    sdf.write.csv(output_path, header=True, mode='overwrite')
+    (
+      sdf.coalesce(1) # coalesce(1) is used to reduce the number of partitions 
+      #to 1, effectively combining the data into a single partition before 
+      #saving. This ensures that the output will be a single CSV file.
+      .write
+      .option("delimiter", ";")
+      .csv(output_path, header=True, mode='overwrite')
+    )
+
