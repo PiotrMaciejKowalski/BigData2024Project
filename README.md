@@ -32,7 +32,7 @@ C:\Users\piotr\Documents\workspace\BigData2024Project>"C:\ProgramData\anaconda3\
 (bigdata) C:\Users\piotr\Documents\workspace\BigData2024Project
 ```
 5. Srodowisko (u mnie nazywane bigdata) musi miec zainstalowane precommit (odpalenie hooka) oraz jupyter (wykonanie konwersji). Trzeba je miec zainstalowane. Jesli ich brakuje wykonujemy
-`pip install jupyter precommit`
+`pip install jupyter pre-commit`
 lub zbiorczo
 `pip install -r requirements.txt`
 6. Wykonujemy akcje git add, status i commit (UWAGA cmd jest dosc toporne przy podpowiadaniu sciezek przy wciskaniu tab - moze byc koniecznosc wpisywania pliku z palca)
@@ -43,3 +43,4 @@ Strip notebooks..........................................................Passed
 [fix-hooks cbc6d0e] try add stripped
  2 files changed, 11 deletions(-)
 ```
+8. W zależności od stacji być może `git push` będzie trzeba wywołać z innego terminala
