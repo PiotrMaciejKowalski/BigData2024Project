@@ -5,7 +5,9 @@ from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
 
 def default_loader(spark: SparkSession, file_path: Optional[str] = None ) -> SparkDataFrame:
     
-    columns = ['lon', 'lat', 'Date', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo','SoilT_10_40cm', 'GVEG', 'PotEvap', 'RootMoist', 'SoilM_100_200cm', "SoilT_40_100cm", ]
+    columns = ['lon', 'lat', 'Date', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo','SoilT_10_40cm', 'GVEG', 'PotEvap', 'RootMoist', 'SoilM_100_200cm',
+                #"SoilT_40_100cm", #FIXME uncomment afete clickup task 86bwwntfk - "Przywrócić kolumnę 'SoilT_40_100cm' do datasetu"
+                ]
 
     if file_path is None:
         file_path = '/content/drive/MyDrive/BigMess/NASA/NASA.csv'
