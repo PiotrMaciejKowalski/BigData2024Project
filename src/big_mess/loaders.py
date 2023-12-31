@@ -5,7 +5,7 @@ from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
 
 def default_loader(spark: SparkSession, file_path: Optional[str] = None ) -> SparkDataFrame:
     
-    columns = ['lon', 'lat', 'Date', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo','SoilT_10_40cm', 'GVEG', 'PotEvap', 'RootMoist', 'SoilM_100_200cm']
+    columns = ['lon', 'lat', 'Date', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo','SoilT_10_40cm', 'GVEG', 'PotEvap', 'RootMoist', 'SoilM_100_200cm', "SoilT_40_100cm", ]
 
     if file_path is None:
         file_path = '/content/drive/MyDrive/BigMess/NASA/NASA.csv'
@@ -56,3 +56,5 @@ def save_to_csv(sdf: SparkDataFrame, output_path: str) -> None:
       .csv(output_path, header=True, mode='overwrite')
     )
 
+def preprocessed_loader(spark: SparkSession, file_path: Optional[str] = None ) -> SparkDataFrame:
+    return spark.read.format('csv').option("header", True).option("inferSchema", "true").option("delimiter", ";").load(file_path)
