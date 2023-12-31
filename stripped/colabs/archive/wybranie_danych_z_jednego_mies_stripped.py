@@ -10,8 +10,9 @@ os.environ["SPARK_HOME"] = "/content/spark-3.5.0-bin-hadoop3"
 import findspark
 findspark.init()
 
+import pandas as pd
 from pyspark.sql import SparkSession
-
+from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
 from google.colab import drive
 
 from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
@@ -26,20 +27,20 @@ spark = SparkSession.builder\
 
 drive.mount('/content/drive')
 
-# Wczytanie zbioru sampled w celu pobrania nazw kolumn
-sampled = pd.read_csv('/content/drive/MyDrive/BigMess/NASA/sampled_NASA_200k.csv')
+columns = ['lon', 'lat', 'Date', 'SWdown', 'LWdown', 'SWnet', 'LWnet', 'Qle', 'Qh', 'Qg', 'Qf', 'Snowf', 'Rainf', 'Evap', 'Qs', 'Qsb', 'Qsm', 'AvgSurfT', 'Albedo', 'SWE', 'SnowDepth', 'SnowFrac', 'SoilT_0_10cm', 'SoilT_10_40cm', 
+           'SoilT_40_100cm', 'SoilT_100_200cm', 'SoilM_0_10cm', 'SoilM_10_40cm', 'SoilM_40_100cm', 'SoilM_100_200cm', 'SoilM_0_100cm', 'SoilM_0_200cm', 'RootMoist', 'SMLiq_0_10cm', 'SMLiq_10_40cm', 'SMLiq_40_100cm', 'SMLiq_100_200cm', 
+           'SMAvail_0_100cm', 'SMAvail_0_200cm', 'PotEvap', 'ECanop', 'TVeg', 'ESoil', 'SubSnow', 'CanopInt', 'ACond', 'CCond', 'RCS', 'RCT', 'RCQ', 'RCSOL', 'RSmin','RSMacr', 'LAI', 'GVEG', 'Streamflow']
 
 # Utworzenie schematu określającego typ zmiennych
-schemat = StructType()
-for i in sampled.columns:
+schema = StructType()
+for i in columns:
   if i == "Date":
-    schemat = schemat.add(i, StringType(), True)
+    schema = schema.add(i, StringType(), True)
   else:
-    schemat = schemat.add(i, FloatType(), True)
+    schema = schema.add(i, FloatType(), True)
 
 # Wczytanie zbioru Nasa w sparku
-nasa = spark.read.format('csv').option("header", True).schema(schemat).load('/content/drive/MyDrive/BigMess/NASA/NASA.csv')
-nasa.show(5)
+nasa = spark.read.format('csv').option("header", True).schema(schema).load('/content/drive/MyDrive/BigMess/NASA/NASA.csv')
 
 nasa.createOrReplaceTempView("nasa")
 
