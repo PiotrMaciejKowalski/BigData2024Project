@@ -10,10 +10,13 @@ os.environ["SPARK_HOME"] = "/content/spark-3.5.0-bin-hadoop3"
 import findspark
 findspark.init()
 
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import pandas as pd
-from pyspark.sql import SparkSession
-from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
 from google.colab import drive
+from pyspark.sql import SparkSession
+from pyspark.sql import DataFrame as SparkDataFrame
+from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
 
 spark = SparkSession.builder\
         .master("local")\
@@ -23,15 +26,13 @@ spark = SparkSession.builder\
 
 drive.mount('/content/drive')
 
-columns = ['lon', 'lat', 'Date', 'SWdown', 'LWdown', 'SWnet', 'LWnet', 'Qle', 'Qh', 'Qg', 'Qf', 'Snowf', 'Rainf', 'Evap', 'Qs', 'Qsb', 'Qsm', 'AvgSurfT', 'Albedo', 'SWE', 'SnowDepth', 'SnowFrac', 'SoilT_0_10cm', 'SoilT_10_40cm', 
-           'SoilT_40_100cm', 'SoilT_100_200cm', 'SoilM_0_10cm', 'SoilM_10_40cm', 'SoilM_40_100cm', 'SoilM_100_200cm', 'SoilM_0_100cm', 'SoilM_0_200cm', 'RootMoist', 'SMLiq_0_10cm', 'SMLiq_10_40cm', 'SMLiq_40_100cm', 'SMLiq_100_200cm', 
-           'SMAvail_0_100cm', 'SMAvail_0_200cm', 'PotEvap', 'ECanop', 'TVeg', 'ESoil', 'SubSnow', 'CanopInt', 'ACond', 'CCond', 'RCS', 'RCT', 'RCQ', 'RCSOL', 'RSmin','RSMacr', 'LAI', 'GVEG', 'Streamflow']
+columns = ['lon', 'lat', 'Date', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo','SoilT_10_40cm', 'GVEG', 'PotEvap', 'RootMoist', 'SoilM_100_200cm']
 
 # Utworzenie schematu określającego typ zmiennych
 schema = StructType()
 for i in columns:
   if i == "Date":
-    schema = schema.add(i, StringType(), True)
+    schema = schema.add(i, IntegerType(), True)
   else:
     schema = schema.add(i, FloatType(), True)
 
@@ -40,14 +41,15 @@ nasa = spark.read.format('csv').option("header", True).schema(schema).load('/con
 
 nasa.createOrReplaceTempView("nasa")
 
-nasa = spark.sql("""
+nasa_ym = spark.sql("""
           SELECT
           CAST(SUBSTRING(CAST(Date AS STRING), 1, 4) AS INT) AS Year,
           CAST(SUBSTRING(CAST(Date AS STRING), 5, 2) AS INT) AS Month,
           n.*
           FROM nasa n
           """)
+nasa_ym = nasa_ym.drop("Date")
 
-nasa = nasa.drop("Date")
-nasa.show(5)
+nasa_ym.createOrReplaceTempView("nasa_ym")
+
 

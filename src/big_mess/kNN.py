@@ -1,88 +1,8 @@
-"""
-## **Implementacja algorytmu kkN**
-"""
-
-"""
-### **1. Wczytanie zbioru**
-"""
-
-!apt-get install openjdk-8-jdk-headless -qq > /dev/null
-!wget -q dlcdn.apache.org/spark/spark-3.5.0/spark-3.5.0-bin-hadoop3.tgz
-!tar xf spark-3.5.0-bin-hadoop3.tgz
-!pip install -q findspark
-
-
-import os
-os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
-os.environ["SPARK_HOME"] = "/content/spark-3.5.0-bin-hadoop3"
-
-import findspark
-findspark.init()
-
-
-from functools import reduce
-import math
-from typing import Optional, Tuple, List
-
+from typing import List, Tuple, Optional
 import pandas as pd
-import numpy as np
 from geopy.distance import geodesic
 
-from pyspark.sql import SparkSession, DataFrame as SparkDataFrame, functions as F
-from pyspark.sql.types import IntegerType, FloatType, StringType, StructType, StructField, Row
-
-from google.colab import drive
-
-
-spark = (
-         SparkSession.builder
-        .master("local")
-        .appName("Colab")
-        .config('spark.ui.port', '4050')
-        .getOrCreate()
-)
-conf = spark.sparkContext._conf.setAll([('spark.executor.memory', '100g'), ('spark.driver.memory','64g')])
-spark.conf.set("park.driver.maxResultSize", "80g")
-
-spark.conf.set('spark.sql.execution.arrow.enabled', 'true')
-
-
-drive.mount('/content/drive')
-
-
-columns = ['lon', 'lat', 'Date', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo','SoilT_10_40cm', 'GVEG', 'PotEvap', 'RootMoist', 'SoilM_100_200cm']
-
-# Utworzenie schematu określającego typ zmiennych
-schema = StructType()
-for i in columns:
-  if i == "Date":
-    schema = schema.add(i, IntegerType(), True)
-  else:
-    schema = schema.add(i, FloatType(), True)
-
-
-%%time
-# Wczytanie zbioru Nasa w sparku
-
-nasa = spark.read.format('csv').option("header", True).schema(schema).load('/content/drive/MyDrive/BigMess/NASA/NASA.csv')
-nasa.createOrReplaceTempView("nasa")
-
-nasa = (
-    nasa
-    .withColumn('Year', (F.col('Date') / 100).cast('int'))
-    .withColumn('Month', F.col('Date') % 100)
-    .drop('Date')
-)
-nasa.show(5)
-
-
-nasa_coords = spark.sql("""SELECT DISTINCT lat, lon FROM nasa""")
-nasa_coords.collect()
-
-
-"""
-### **2. Implementacja algorytmu kNN:**
-"""
+from pyspark.sql.types import Row
 
 # function searches for points that lie within a (euclidean) ball of size *radius* around the query points
 # if optional argument *k* is given then function searches for at most k nearest points that lie within
@@ -118,8 +38,7 @@ def kRadiusNN(df: List[Row], radius: float, point: Tuple[float, float], label_co
 
   return(neighbours_pd)
 
-
-# weighted: if True then function will weight points by the inverse of their distance (in this case, closer neighbours of
+#weighted: if True then function will weight points by the inverse of their distance (in this case, closer neighbours of
 # a query point will have a greater influence than neighbors which are further away).
 
 
@@ -153,37 +72,3 @@ def predict_class(df: List[Row], point: Tuple[float, float], radius: float, labe
       predicted_label = neighbours[label_column_name].mode().iat[0]
 
     return predicted_label
-
-
-"""
-Wygenerujemy w sposób sztuczny etykiety dla zbioru w celu przetestowania funkcji:
-"""
-
-df = nasa_coords.withColumn('label', (F.col('lat').cast('int'))%2)
-
-
-df = df.collect()
-
-
-%%time
-predict_class(df, (40.5, -95), 18, "label", k=8, weighted=True)
-
-
-%%time
-predict_class(df, (29.5, -92), 20, "label", k=None, weighted=False)
-
-
-%%time
-predict_class(df, (31.5, -112), 20, "label", k=8, weighted=True)
-
-
-%%time
-predict_class(df, (40.5, -95), 18, "label", k=8, weighted=True)
-
-
-%%time
-predict_class(df, (49.375, -80.125), 15, "label", k=8, weighted=True)
-
-
-
-

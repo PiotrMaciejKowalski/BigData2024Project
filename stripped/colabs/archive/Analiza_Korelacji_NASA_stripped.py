@@ -1,7 +1,3 @@
-"""
-# W tym pliku zajmiemy się analizą korealcji między roślinnością, a innymi cechami zawartymi w naszych danych
-"""
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,13 +13,7 @@ from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
 from pyspark.ml.stat import Correlation
 from pyspark.ml.feature import VectorAssembler
 
-
 spark = SparkSession.builder.appName('Corr_Analysis').getOrCreate()
-
-
-"""
-Teraz zaimportujemy dane
-"""
 
 drive.mount('/content/drive')
 
@@ -42,19 +32,9 @@ for i in columns:
 nasa = spark.read.format('csv').option("header", True).schema(schemat).load('/content/drive/MyDrive/BigMess/NASA/NASA.csv')
 nasa.show(5)
 
-
-"""
-Po wczytaniu danych usuniemy kolumny, które nie będą nam potrzebne przy analizie korelacji roślinności z pozostałymi zmiennymi
-"""
-
 # usuwamy z danych kolumny odpowiadające za długość i szerokość geograficzną oraz datę
 nasa = nasa.drop(*['lon', 'lat', 'Date'])
 nasa.show(5)
-
-
-"""
-W naszych rozważaniach zajmiemy się głównie kolumną "GVEG", która odpowiada za wskaźnik "zielonej roślinności". Odnosi się do roślin o zielonych liściach, które są zdolne do fotosyntezy. Poniżej stowrzymy macierz korelacji, a następnie przedstawimy ją w postaci heat mapy.
-"""
 
 # convert to vector column first
 vector_col = "corr_features"
@@ -64,14 +44,12 @@ nasa_vector = assembler.transform(nasa).select(vector_col)
 # get correlation matrix
 corr_matrix = Correlation.corr(nasa_vector, vector_col)
 
-
 corr_matrix_pd = pd.DataFrame(np.array(corr_matrix.collect()[0][0].toArray()), columns=nasa.columns, index=nasa.columns)
-
 
 # Tworzymy nasza heatmapę. Niestety funkcje pokroju sns.heatmap nie nadają się same w sobie do prezentacji tak dużych macierzy korelacji zatem potrzebne sa im pewne modyfikacje. Poniżej stowrzymy nasz wykres w taki sposób
 # aby po kliknięciu na grafikę ulegała ona przybliżeniu i wyostrzeniu
 
-def heatmap_plot(corr_matrix_pd):
+def heatmap_plot(corr_matrix_pd, savefile_path: str, savefile_dpi: int = 300):
 
   corr_matrix_np = corr_matrix_pd.to_numpy()
   print(plt.get_backend())
@@ -92,21 +70,10 @@ def heatmap_plot(corr_matrix_pd):
 
   ax.set_title('correlation matrix')
   plt.tight_layout()
-  plt.savefig("corr_matrix.png", dpi=300)
-
-  files.download("corr_matrix.png")
+  plt.savefig(savefile_path, dpi=savefile_dpi)
 
 
-heatmap_plot(corr_matrix_pd)
-
-
-"""
-# Analiza korelacji
-
-Z powyższej grafiki możemy już wysnuć pewne wnioski i wstępnie wybrać zmienne, które są skorelowane z naszą zmienną GVEG czyli wskaźnikiem zielonej roślinności.
-
-Z pośród zmiennych, które wydają się wykazywać pewne zależności względem zmiennej GVEG mamy:
-"""
+heatmap_plot(corr_matrix_pd, 'correlation_matrix.png')
 
 #@title tabela najsilniej skorelowanych zmiennych
 
@@ -119,7 +86,5 @@ table.field_names = ["Nazwa zmiennej", "Objaśnienie zmiennej", "Współczynnik 
 for row in rows:
   table.add_row(row)
 print(table)
-
-
 
 

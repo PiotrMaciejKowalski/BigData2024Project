@@ -5,69 +5,30 @@ import os
 from google.colab import drive
 drive.mount("/content/drive")
 
-
 NASA = pd.read_csv('/content/drive/MyDrive/sampled_NASA_200k.csv')
-
 
 print("Lon Range:", NASA['lon'].min(), NASA['lon'].max())
 print("Lat Range:", NASA['lat'].min(), NASA['lat'].max())
 
-
-"""
-##### Wybranie ciepłych miesięcy, aby otrzymać realny obraz występującej roślinności
-"""
-
 NASA['Date'] = NASA['Date'].astype(str)
 NASA_lato = NASA[NASA['Date'].str[-2:].isin(["05", "06", "07", "08", "09", "10"])]
-
-
-"""
-##### Kolumny, które mogą mieć największy wpływ na pustynnienie (wg ustaleń Mariusza po przeprowadzonym researchu; link: https://github.com/PiotrMaciejKowalski/BigData2024Project/blob/main/research.md)
-"""
 
 selected_columns = ["lon", "lat", "Rainf", "Evap", "AvgSurfT", "Albedo", "SoilT_40_100cm", "GVEG"]
 NASA_lato = NASA_lato[selected_columns].dropna()
 
-
 NASA_lato.head(5)
-
-
-"""
-# CD - Chihuahuan Desert
-# CP - Colorado Plateau
-# GBD - Great Basin Desert
-"""
-
-"""
-##### Obszary pustynne
-"""
 
 CD = NASA_lato[(NASA_lato['lon'] >= -104) & (NASA_lato['lon'] <= -102) & (NASA_lato['lat'] >= 30) & (NASA_lato['lat'] <= 31)]
 CP = NASA_lato[(NASA_lato['lon'] >= -110.5) & (NASA_lato['lon'] <= -108.5) & (NASA_lato['lat'] >= 39) & (NASA_lato['lat'] <= 40.5)]
 GBD = NASA_lato[(NASA_lato['lon'] >= -116) & (NASA_lato['lon'] <= -114) & (NASA_lato['lat'] >= 40) & (NASA_lato['lat'] <= 41.5)]
 
-
-"""
-##### Obszary pustynno - niepustynne
-"""
-
 CD_i_niepustynia = NASA_lato[(NASA_lato['lon'] >= -106.5) & (NASA_lato['lon'] <= -104.5) & (NASA_lato['lat'] >= 32.5) & (NASA_lato['lat'] <= 33.5)]
 CP_i_niepustynia = NASA_lato[(NASA_lato['lon'] >= -109) & (NASA_lato['lon'] <= -107) & (NASA_lato['lat'] >= 37.5) & (NASA_lato['lat'] <= 39)]
 GBD_i_niepustynia = NASA_lato[(NASA_lato['lon'] >= -115) & (NASA_lato['lon'] <= -113) & (NASA_lato['lat'] >= 42.5) & (NASA_lato['lat'] <= 44)]
 
-
-"""
-##### Obszary niepustynne
-"""
-
 niepustynia_przy_CD = NASA_lato[(NASA_lato['lon'] >= -109.5) & (NASA_lato['lon'] <= -107.5) & (NASA_lato['lat'] >= 33) & (NASA_lato['lat'] <= 34)]
 niepustynia_przy_CP = NASA_lato[(NASA_lato['lon'] >= -107) & (NASA_lato['lon'] <= -105) & (NASA_lato['lat'] >= 39) & (NASA_lato['lat'] <= 40.5)]
 niepustynia_przy_GBD = NASA_lato[(NASA_lato['lon'] >= -124) & (NASA_lato['lon'] <= -122) & (NASA_lato['lat'] >= 39.5) & (NASA_lato['lat'] <= 41)]
-
-
-"""
-# Wizualizacje + wstępne ustalenia parametrów
-"""
 
 def plot_histogram(ax, data, column, title, color):
     ax.hist(data[column], bins=20, color=color, edgecolor="black")
@@ -80,11 +41,6 @@ def plot_histogram(ax, data, column, title, color):
                 max(max(CD[column]), max(CD_i_niepustynia[column]), max(niepustynia_przy_CD[column]),
                     max(CP[column]), max(CP_i_niepustynia[column]), max(niepustynia_przy_CP[column]),
                     max(GBD[column]), max(GBD_i_niepustynia[column]), max(niepustynia_przy_GBD[column])))
-
-
-"""
-##### GVEG (wskaźnik roślinności)
-"""
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
@@ -103,18 +59,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'GVEG', "GBD_nie-pustynia", "gr
 plt.tight_layout()
 plt.show()
 
-
 first_quartiles_GVEG = (niepustynia_przy_CD['GVEG'].quantile(0.25), niepustynia_przy_CP['GVEG'].quantile(0.25), niepustynia_przy_GBD['GVEG'].quantile(0.25))
-
 
 print("first_quartiles:", first_quartiles_GVEG)
 
-
 third_quartiles_GVEG = (CD['GVEG'].quantile(0.75), CP['GVEG'].quantile(0.75), GBD['GVEG'].quantile(0.75))
 
-
 print("third_quartiles:", third_quartiles_GVEG)
-
 
 GVEG_graniczne = round(
     pd.Series([
@@ -129,11 +80,6 @@ GVEG_graniczne = round(
 
 
 print("GVEG_graniczne:", GVEG_graniczne)
-
-
-"""
-##### Rainf (wskaźnik opadów deszczu)
-"""
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
@@ -152,18 +98,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'Rainf', "GBD_nie-pustynia", "g
 plt.tight_layout()
 plt.show()
 
-
 first_quartiles_Rainf = (CD_i_niepustynia['Rainf'].quantile(0.25), CP_i_niepustynia['Rainf'].quantile(0.25), GBD_i_niepustynia['Rainf'].quantile(0.25))
-
 
 print("first_quartiles:", first_quartiles_Rainf)
 
-
 third_quartiles_Rainf = (CD_i_niepustynia['Rainf'].quantile(0.75), CP_i_niepustynia['Rainf'].quantile(0.75), GBD_i_niepustynia['Rainf'].quantile(0.75))
 
-
 print("third_quartiles:", third_quartiles_Rainf)
-
 
 Rainf_graniczne = round(
     pd.Series([
@@ -176,13 +117,7 @@ Rainf_graniczne = round(
     ]).mean()
 )
 
-
 print("Rainf_graniczne:", Rainf_graniczne)
-
-
-"""
-##### Evap (wskaźnik całkowitej ewapotranspiracji)
-"""
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
@@ -201,18 +136,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'Evap', "GBD_nie-pustynia", "gr
 plt.tight_layout()
 plt.show()
 
-
 first_quartiles_Evap = (niepustynia_przy_CD['Evap'].quantile(0.25), niepustynia_przy_CP['Evap'].quantile(0.25), niepustynia_przy_GBD['Evap'].quantile(0.25))
-
 
 print("first_quartiles:", first_quartiles_Evap)
 
-
 third_quartiles_Evap = (CD['Evap'].quantile(0.75), CP['Evap'].quantile(0.75), GBD['Evap'].quantile(0.75))
 
-
 print("third_quartiles:", third_quartiles_Evap)
-
 
 Evap_graniczne = round(
     pd.Series([
@@ -225,13 +155,7 @@ Evap_graniczne = round(
     ]).mean()
 )
 
-
 print("Evap_graniczne:", Evap_graniczne)
-
-
-"""
-##### AvgSurfT (wskaźnik średniej temperatury powierzchni ziemi)
-"""
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
@@ -250,18 +174,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'AvgSurfT', "GBD_nie-pustynia",
 plt.tight_layout()
 plt.show()
 
-
 first_quartiles_AvgSurfT = (CD['AvgSurfT'].quantile(0.25), CP['AvgSurfT'].quantile(0.25), GBD['AvgSurfT'].quantile(0.25))
-
 
 print("first_quartiles:", first_quartiles_AvgSurfT)
 
-
 third_quartiles_AvgSurfT = (niepustynia_przy_CD['AvgSurfT'].quantile(0.75), niepustynia_przy_CP['AvgSurfT'].quantile(0.75), niepustynia_przy_GBD['AvgSurfT'].quantile(0.75))
 
-
 print("third_quartiles:", third_quartiles_AvgSurfT)
-
 
 AvgSurfT_graniczne = round(
     pd.Series([
@@ -274,13 +193,7 @@ AvgSurfT_graniczne = round(
     ]).mean()
 )
 
-
 print("AvgSurfT_graniczne:", AvgSurfT_graniczne)
-
-
-"""
-##### Albedo (wskaźnik albedo)
-"""
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
@@ -299,18 +212,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'Albedo', "GBD_nie-pustynia", "
 plt.tight_layout()
 plt.show()
 
-
 first_quartiles_Albedo = (CD['Albedo'].quantile(0.25), CP['Albedo'].quantile(0.25), GBD['Albedo'].quantile(0.25))
-
 
 print("first_quartiles:", first_quartiles_Albedo)
 
-
 third_quartiles_Albedo = (niepustynia_przy_CD['Albedo'].quantile(0.75), niepustynia_przy_CP['Albedo'].quantile(0.75), niepustynia_przy_GBD['Albedo'].quantile(0.75))
 
-
 print("third_quartiles:", third_quartiles_Albedo)
-
 
 Albedo_graniczne = round(
     pd.Series([
@@ -323,13 +231,7 @@ Albedo_graniczne = round(
     ]).mean(), 1
 )
 
-
 print("Albedo_graniczne:", Albedo_graniczne)
-
-
-"""
-##### SoilT_40_100cm (wskaźnik temperatury gleby w warstwie o głębokości od 40 do 100 cm)
-"""
 
 fig, axes = plt.subplots(3, 3, figsize=(15, 15))
 
@@ -348,18 +250,13 @@ plot_histogram(axes[2, 2], niepustynia_przy_GBD, 'SoilT_40_100cm', "GBD_nie-pust
 plt.tight_layout()
 plt.show()
 
-
 first_quartiles_SoilT_40_100cm = (CD['SoilT_40_100cm'].quantile(0.25), CP['SoilT_40_100cm'].quantile(0.25), GBD['SoilT_40_100cm'].quantile(0.25))
-
 
 print("first_quartiles:", first_quartiles_SoilT_40_100cm)
 
-
 third_quartiles_SoilT_40_100cm = (niepustynia_przy_CD['SoilT_40_100cm'].quantile(0.75), niepustynia_przy_CP['SoilT_40_100cm'].quantile(0.75), niepustynia_przy_GBD['SoilT_40_100cm'].quantile(0.75))
 
-
 print("third_quartiles:", third_quartiles_SoilT_40_100cm)
-
 
 SoilT_40_100cm_graniczne = round(
     pd.Series([
@@ -372,17 +269,10 @@ SoilT_40_100cm_graniczne = round(
     ]).mean()
 )
 
-
 print("SoilT_40_100cm_graniczne:", SoilT_40_100cm_graniczne)
-
-
-"""
-# Klasyfikacja: pustynia / nie-pustynia
-"""
 
 NASA = NASA[['lon', 'lat', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo', 'SoilT_40_100cm', 'GVEG']].dropna()
 NASA['klasyfikacja'] = np.nan
-
 
 def classify(row: pd.DataFrame):
     conditions = [
@@ -398,18 +288,12 @@ def classify(row: pd.DataFrame):
     else:
         return "nie-pustynia"
 
-
 NASA['klasyfikacja'] = NASA.apply(classify, axis=1)
-
 
 NASA.head(10)
 
-
 pustynia_percentage = (NASA['klasyfikacja'] == "pustynia").sum() / len(NASA)
 
-
 print("pustynia_percentage:", pustynia_percentage)
-
-
 
 
