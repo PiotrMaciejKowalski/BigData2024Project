@@ -43,5 +43,3 @@ nasa_anotated = load_anotated(spark)
 nasa_anotated.count()
 
 save_to_csv(nasa_anotated, '/content/drive/MyDrive/BigMess/NASA/NASA_anotated_preprocessed.csv')
-
-2+2
