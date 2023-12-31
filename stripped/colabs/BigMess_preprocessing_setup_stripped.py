@@ -29,5 +29,3 @@ spark = SparkSession.builder\
 nasa = default_loader(spark)
 
 nasa.show(5)
-
-2+2
