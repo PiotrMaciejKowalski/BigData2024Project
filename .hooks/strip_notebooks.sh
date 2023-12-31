@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/usr/bin/env bash -e
 
 IFS=$'\n'
 
@@ -22,27 +22,8 @@ for file in "${files[@]}" ; do
         mkdir -p "$stripped_dir"
         target_stripped_file="${stripped_dir}/${filename%.ipynb}_stripped.py"
 
-        python3 <(cat <<SCRIPT
-import json
-import sys
-
-data = json.load(sys.stdin)
-for cell in data['cells']:
-    cell_type = cell['cell_type']
-    source = cell['source']
-    if cell_type in ('markdown', 'raw'):
-        print('"""')
-        for line in source:
-            print(line.rstrip('\n'))
-        print('"""\n')
-    elif cell_type == 'code':
-        for line in source:
-            print(line.rstrip('\n'))
-        print('\n')
-    else:
-        raise ValueError('Cell type', cell_type)
-SCRIPT
-        ) <"$file" >"$target_stripped_file"
+        jupyter nbconvert --to script $file
+        mv ${file%.ipynb}.txt $target_stripped_file
 		
         if [  "$should_git_add" == true ]; then 
           git add "$target_stripped_file" 
