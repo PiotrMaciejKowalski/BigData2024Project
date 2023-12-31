@@ -25,3 +25,14 @@ def default_loader(spark: SparkSession, file_path: Optional[str] = None ) -> Spa
         .select([F.col(column) for column in sdf.columns if column != 'Date'])
         )
     
+
+def save_to_csv(sdf: SparkDataFrame, output_path: str) -> None:
+    """
+    Save a PySpark DataFrame to a CSV file.
+
+    Parameters:
+    - df: PySpark DataFrame
+    - output_path: Output path for the CSV file
+    """
+    # Save the DataFrame to CSV
+    sdf.write.csv(output_path, header=True, mode='overwrite')
