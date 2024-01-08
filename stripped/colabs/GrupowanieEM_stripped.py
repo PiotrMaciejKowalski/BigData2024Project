@@ -394,5 +394,3 @@ for i in range(12):
   colormap = get_colormap([0, 1], ['green', 'yellow'])
   output_notebook()
   show(plot_map(df=df, parameter_name='label', colormap=colormap, alpha=0.5))
-
-2+2
