@@ -88,9 +88,18 @@ NASA_sample_annotated = pd.read_csv('/content/drive/MyDrive/BigMess/NASA/NASA_an
 NASA_sample_annotated = spark.createDataFrame(NASA_sample_annotated).withColumnRenamed("lat", "lat_sam").withColumnRenamed("lon", "lon_sam")
 NASA_sample_annotated.show(5)
 
- NASA_2020_an = nasa2020.join( NASA_sample_annotated,
-                [nasa2020.lon==NASA_sample_annotated.lon_sam , nasa2020.lat==NASA_sample_annotated.lat_sam],
-                "inner").drop('lat_sam').drop('lon_sam')
+ NASA_2020_an = (
+     nasa2020
+     .join( 
+        NASA_sample_annotated, 
+        [
+             nasa2020.lon==NASA_sample_annotated.lon_sam , 
+             nasa2020.lat==NASA_sample_annotated.lat_sam
+         ],
+          "inner"
+      )
+      .drop('lat_sam','lon_sam')
+  )
 
  NASA_2020_an.show(5)
 
