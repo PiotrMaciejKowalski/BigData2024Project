@@ -201,9 +201,11 @@ stNASA2020_ver2 = st_NASA2020.drop(columns = ['GVEG1', 'GVEG2', 'GVEG12'])
 gm = GaussianMixture(n_components = 2, n_init = 300, max_iter=200, init_params= 'random_from_data', covariance_type='spherical', random_state=42)
 gm_result = gm.fit_predict(stNASA2020_ver2)
 
-print(accuracy_score(gm_result, labels_))
-print(precision_score(gm_result, labels_))
-print(jaccard_score(gm_result, labels_))
+{ 
+'accuracy' : accuracy_score(gm_result, labels_),
+'precision' : precision_score(gm_result, labels_),
+'jaccard' : jaccard_score(gm_result, labels_),
+}
 
 
 NASA_2020_set
