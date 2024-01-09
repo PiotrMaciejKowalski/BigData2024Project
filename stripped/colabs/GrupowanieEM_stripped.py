@@ -252,7 +252,7 @@ months = [5,6,7,8,9,11]
 for i in range(6):
   acc, pre, jac, labels2 = gmm_monthly_data(months[i], NASA_2020_set)
   for j in range(len(labels1)):
-     labels1[j] = labels1[j] + labels2[j]
+     labels1[j] += labels2[j]
 
 for j in range(len(labels1)):
   if labels1[j]>=4:
