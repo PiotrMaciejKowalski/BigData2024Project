@@ -276,17 +276,21 @@ NASA2020_median = (NASA2020_full[['lon', 'lat', 'PotEvap', 'Evap', 'SoilM_100_20
 NASA2020 = NASA2020.merge(NASA2020_median, how='inner', on=['lon', 'lat'])
 
 
-for i in range(4, 10):
-    NASA2020 = add_column('RootMoist', i , NASA2020_full, NASA2020)
+default_months = list(range(5, 10))
+features_interesting_months = {
+'RootMoist' : list(range(4, 10)),
+'GVEG' : list(range(4, 11)),
+'Rainf' : default_month, 
+'PotEvap' : default_month, 
+'Evap' : default_month, 
+'Albedo' : default_month,
 
-for i in range(4, 11):
-    NASA2020 = add_column('GVEG', i , NASA2020_full, NASA2020)
-
-for feat in ['Rainf', 'PotEvap', 'Evap', 'Albedo']:
-   for i in range(5, 10):
-
-     NASA2020 = add_column(feat, i, NASA2020_full, NASA2020)
-
+ }
+ 
+ for feature, months in features_interesting_months.items():
+    for month in months:
+       NASA2020 = add_column(feature, month , NASA2020_full, NASA2020)
+ 
 
 NASA2020.head()
 
