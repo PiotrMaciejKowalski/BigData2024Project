@@ -26,7 +26,7 @@ spark = SparkSession.builder\
 
 drive.mount('/content/drive')
 
-columns = ['lon', 'lat', 'Date', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo','SoilT_10_40cm', 'GVEG', 'PotEvap', 'RootMoist', 'SoilM_100_200cm']
+columns = ['lon', 'lat', 'Date', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo','SoilT_40_100cm', 'GVEG', 'PotEvap', 'RootMoist', 'SoilM_100_200cm']
 
 # Utworzenie schematu określającego typ zmiennych
 schema = StructType()
