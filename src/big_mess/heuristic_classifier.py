@@ -4,6 +4,7 @@ from pyspark.sql import DataFrame as SparkDataFrame, functions as F
 
 
 def heuristic_classify(data: SparkDataFrame) -> SparkDataFrame:
+    assert all([_ for column in data.columns if '_condition' not in column ]), "the data must not contain condition in any column name"
     less_than_columns = {
         "Rainf": 30,
         "Evap": 33,
@@ -26,13 +27,16 @@ def heuristic_classify(data: SparkDataFrame) -> SparkDataFrame:
         data = data.withColumn(
             f"{column}_condition", F.when(F.col(column) >= value, 1).otherwise(0)
         )
-    data = data.withColumn(
-        "conditions_fullfiled_sum",
-        sum(F.col(column + "_condition") for column in columns_to_check),
-    )
-    return data.withColumn(
-        "Pustynia",
-        F.when(
-            F.col("conditions_fullfiled_sum") >= minimal_condition_count, 1
-        ).otherwise(0),
+    return (
+        data.withColumn(
+            "conditions_fullfiled_sum",
+            sum(F.col(column + "_condition") for column in columns_to_check),
+        )
+        .withColumn(
+            "Pustynia",
+            F.when(
+                F.col("conditions_fullfiled_sum") >= minimal_condition_count, 1
+            ).otherwise(0),
+        )
+        .drop("conditions_fullfiled_sum", *[column for column in data.columns if '_condition' in column])
     )
