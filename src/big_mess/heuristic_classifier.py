@@ -4,7 +4,7 @@ from pyspark.sql import DataFrame as SparkDataFrame, functions as F
 
 
 def heuristic_classify(data: SparkDataFrame) -> SparkDataFrame:
-    assert all([_ for column in data.columns if '_condition' not in column ]), "the data must not contain condition in any column name"
+    assert all([column for column in data.columns if '_condition' not in column ]), "the data must not contain condition in any column name"
     less_than_columns = {
         "Rainf": 30,
         "Evap": 33,
