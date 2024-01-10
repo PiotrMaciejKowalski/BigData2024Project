@@ -41,10 +41,13 @@ def default_loader(
 
 
 def load_single_month(
-    spark: SparkSession, file_path: Optional[str] = None
+    spark: SparkSession,
+    file_path: Optional[str] = None,
+    year: int = 2023,
+    month: int = 1,
 ) -> SparkDataFrame:
     data = default_loader(spark, file_path)
-    return data.filter("Year = 2023").filter("Month = 1")
+    return data.filter(f"Year = {year}").filter(f"Month = {month}")
 
 
 def load_anotated(
