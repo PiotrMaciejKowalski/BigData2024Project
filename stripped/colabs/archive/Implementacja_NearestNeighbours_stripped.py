@@ -1,16 +1,7 @@
-"""
-## **Implementacja algorytmu kkN**
-"""
-
-"""
-### **1. Wczytanie zbioru**
-"""
-
 !apt-get install openjdk-8-jdk-headless -qq > /dev/null
 !wget -q dlcdn.apache.org/spark/spark-3.5.0/spark-3.5.0-bin-hadoop3.tgz
 !tar xf spark-3.5.0-bin-hadoop3.tgz
 !pip install -q findspark
-
 
 import os
 os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
@@ -18,7 +9,6 @@ os.environ["SPARK_HOME"] = "/content/spark-3.5.0-bin-hadoop3"
 
 import findspark
 findspark.init()
-
 
 from functools import reduce
 import math
@@ -33,7 +23,6 @@ from pyspark.sql.types import IntegerType, FloatType, StringType, StructType, St
 
 from google.colab import drive
 
-
 spark = (
          SparkSession.builder
         .master("local")
@@ -46,9 +35,7 @@ spark.conf.set("park.driver.maxResultSize", "80g")
 
 spark.conf.set('spark.sql.execution.arrow.enabled', 'true')
 
-
 drive.mount('/content/drive')
-
 
 columns = ['lon', 'lat', 'Date', 'Rainf', 'Evap', 'AvgSurfT', 'Albedo','SoilT_10_40cm', 'GVEG', 'PotEvap', 'RootMoist', 'SoilM_100_200cm']
 
@@ -59,7 +46,6 @@ for i in columns:
     schema = schema.add(i, IntegerType(), True)
   else:
     schema = schema.add(i, FloatType(), True)
-
 
 %%time
 # Wczytanie zbioru Nasa w sparku
@@ -75,14 +61,8 @@ nasa = (
 )
 nasa.show(5)
 
-
 nasa_coords = spark.sql("""SELECT DISTINCT lat, lon FROM nasa""")
 nasa_coords.collect()
-
-
-"""
-### **2. Implementacja algorytmu kNN:**
-"""
 
 # function searches for points that lie within a (euclidean) ball of size *radius* around the query points
 # if optional argument *k* is given then function searches for at most k nearest points that lie within
@@ -117,7 +97,6 @@ def kRadiusNN(df: List[Row], radius: float, point: Tuple[float, float], label_co
          raise Exception("No neighbours found within the given radius")
 
   return(neighbours_pd)
-
 
 # weighted: if True then function will weight points by the inverse of their distance (in this case, closer neighbours of
 # a query point will have a greater influence than neighbors which are further away).
@@ -155,27 +134,18 @@ def predict_class(df: List[Row], point: Tuple[float, float], radius: float, labe
     return predicted_label
 
 
-"""
-Wygenerujemy w sposób sztuczny etykiety dla zbioru w celu przetestowania funkcji:
-"""
-
 df = nasa_coords.withColumn('label', (F.col('lat').cast('int'))%2)
 
-
 df = df.collect()
-
 
 %%time
 predict_class(df, (40.5, -95), 18, "label", k=8, weighted=True)
 
-
 %%time
 predict_class(df, (29.5, -92), 20, "label", k=None, weighted=False)
 
-
 %%time
 predict_class(df, (31.5, -112), 20, "label", k=8, weighted=True)
-
 
 %%time
 predict_class(df, (40.5, -95), 18, "label", k=8, weighted=True)
@@ -183,7 +153,5 @@ predict_class(df, (40.5, -95), 18, "label", k=8, weighted=True)
 
 %%time
 predict_class(df, (49.375, -80.125), 15, "label", k=8, weighted=True)
-
-
 
 

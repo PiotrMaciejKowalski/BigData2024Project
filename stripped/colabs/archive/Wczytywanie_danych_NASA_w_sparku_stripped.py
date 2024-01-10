@@ -11,9 +11,9 @@ import findspark
 findspark.init()
 
 import pandas as pd
+from google.colab import drive
 from pyspark.sql import SparkSession
 from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
-from google.colab import drive
 
 spark = SparkSession.builder\
         .master("local")\
@@ -37,10 +37,11 @@ for i in columns:
 
 # Wczytanie zbioru Nasa w sparku
 nasa = spark.read.format('csv').option("header", True).schema(schema).load('/content/drive/MyDrive/BigMess/NASA/NASA.csv')
+nasa.show(5)
 
 nasa.createOrReplaceTempView("nasa")
 
-nasa = spark.sql("""
+nasa_ym = spark.sql("""
           SELECT
           CAST(SUBSTRING(CAST(Date AS STRING), 1, 4) AS INT) AS Year,
           CAST(SUBSTRING(CAST(Date AS STRING), 5, 2) AS INT) AS Month,
@@ -48,6 +49,5 @@ nasa = spark.sql("""
           FROM nasa n
           """)
 
-nasa = nasa.drop("Date")
-nasa.show(5)
-
+nasa_ym = nasa_ym.drop("Date")
+nasa_ym.createOrReplaceTempView("nasa_ym")
