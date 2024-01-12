@@ -15,11 +15,11 @@ def default_loader(
         "Evap",
         "AvgSurfT",
         "Albedo",
-        "SoilM_100_200cm",  
+        "SoilT_40_100cm",
         "GVEG",
         "PotEvap",
         "RootMoist",
-        "SoilT_40_100cm",
+        "SoilM_100_200cm",  
     ]
 
     if file_path is None:
