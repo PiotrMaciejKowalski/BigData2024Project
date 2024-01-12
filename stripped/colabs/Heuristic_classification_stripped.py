@@ -6,14 +6,6 @@ drive.mount('/content/drive')
 !git checkout refactoring-sprint2
 %cd ..
 
-%cd BigData2024Project
-!git pull
-%cd ..
-
-%cd BigData2024Project
-!git status
-%cd ..
-
 !chmod 755 /content/BigData2024Project/src/setup.sh
 !/content/BigData2024Project/src/setup.sh
 
@@ -40,4 +32,6 @@ data.show(5)
 result = heuristic_classify(data)
 result.show(20)
 
-save_to_csv(result.drop("Rainf_condition","Evap_condition","GVEG_condition","AvgSurfT_condition","Albedo_condition","conditions_fullfiled_sum"), '/content/drive/MyDrive/BigMess/NASA/NASA_heuristic.csv')
+save_to_csv(result, '/content/drive/MyDrive/BigMess/NASA/NASA_heuristic.csv')
+
+
