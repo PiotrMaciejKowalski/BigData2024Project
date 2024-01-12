@@ -19,7 +19,7 @@ def default_loader(
         "GVEG",
         "PotEvap",
         "RootMoist",
-        "SoilM_100_200cm",  
+        "SoilM_100_200cm",
     ]
 
     if file_path is None:
@@ -32,7 +32,13 @@ def default_loader(
         else:
             schema = schema.add(i, FloatType(), True)
 
-    sdf = spark.read.format("csv").option("header", True).schema(schema).load(file_path)
+    sdf = (
+        spark.read.format("csv")
+        .option("header", True)
+        .option("enforceSchema", False)
+        .schema(schema)
+        .load(file_path)
+    )
     return (
         sdf.withColumn("Year", sdf["Date"].substr(1, 4).cast("int"))
         .withColumn("Month", sdf["Date"].substr(5, 2).cast("int"))
