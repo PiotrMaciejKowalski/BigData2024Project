@@ -15,7 +15,7 @@ def default_loader(
         "Evap",
         "AvgSurfT",
         "Albedo",
-        "SoilT_10_40cm",
+        "SoilM_100_200cm",  
         "GVEG",
         "PotEvap",
         "RootMoist",
