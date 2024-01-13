@@ -186,12 +186,11 @@ desert_label_an = labels_an['pustynia'].tolist()
 gm = GaussianMixture(n_components = 2, n_init = 300, max_iter=200, init_params= 'k-means++', covariance_type='spherical', random_state=42)
 gm_result = gm.fit_predict(NASA2020_annual_an_st)
 
-metrics = {
+{
 'accuracy' : accuracy_score(gm_result, desert_label_an),
 'precision' : precision_score(gm_result, desert_label_an),
 'jaccard' : jaccard_score(gm_result, desert_label_an),
 }
-print(metrics)
 
 NASA_2020_an_pd.head()
 
