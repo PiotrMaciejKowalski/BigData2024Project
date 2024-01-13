@@ -678,37 +678,7 @@ plot_6 = plot_map(df=df_month_202308, parameter_name='Model_3', colormap=colorma
 output_notebook()
 show(plot_6)
 
-"""### Dane z 07.1979
-
-Do klasyfikacji wykorzytamy modele zbudowane na danych lipcowych.
-"""
-
-spark_month_197907 = load_single_month(spark,year=1979, month=7)
-
-df_month_197907 = spark_month_197907.toPandas()
-
-df_month_197907['Model_1'] = list_of_models_m1[6].predict(df_month_197907.loc[:,'Rainf':'SoilM_100_200cm'])
-
-df_month_197907['Model_2'] = list_of_models_m2[6].predict(df_month_197907.loc[:,'Rainf':'SoilM_100_200cm'])
-
-df_month_197907['Model_3'] = list_of_models_m3[6].predict(df_month_197907.loc[:,'Rainf':'SoilM_100_200cm'])
-
-colormap_cluster = get_colormap([0, max(df_month_197907.Model_1.values)], ['yellow', 'darkgreen'])
-plot_4 = plot_map(df=df_month_197907, parameter_name='Model_1', colormap=colormap_cluster, title="Detekcja pustynia (1) - step(2) - inne(3)", alpha=1)
-output_notebook()
-show(plot_4)
-
-colormap_cluster = get_colormap([0, max(df_month_197907.Model_2.values)], ['darkgreen', 'yellow'])
-plot_5 = plot_map(df=df_month_197907, parameter_name='Model_2', colormap=colormap_cluster, title="Detekcja pustynia (1) - niepustynia (0)", alpha=1)
-output_notebook()
-show(plot_5)
-
-colormap_cluster = get_colormap([0, max(df_month_197907.Model_3.values)], ['darkgreen', 'yellow'])
-plot_6 = plot_map(df=df_month_197907, parameter_name='Model_3', colormap=colormap_cluster, title="detekcja step (1) - niestep (0)", alpha=1)
-output_notebook()
-show(plot_6)
-
-"""### Klsyfikacja pustyn dla kazdego miesiaca
+"""### Klasyfikacja pustyn dla kazdego miesiaca
 
 Styczen
 """
