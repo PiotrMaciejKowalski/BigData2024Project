@@ -505,5 +505,3 @@ for pair in combinations(column_names, 2):
   output_notebook()
   show(plot_map(df=df, parameter_name='label', colormap=colormap, alpha=0.5))
 
-
-2+2
