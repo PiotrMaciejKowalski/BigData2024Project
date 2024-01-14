@@ -779,5 +779,3 @@ for para in lista_kombinacji:
 
 #Zapisanie pliku jako html
 #!jupyter nbconvert --to html "/content/Grupowanie_k_meanss.ipynb"
-
-2+2
