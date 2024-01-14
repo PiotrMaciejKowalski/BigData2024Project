@@ -350,6 +350,3 @@ show(plot_map(df=nasa_floods_pd, parameter_name='Prediction', colormap=colormap_
 Klasyfikacja drzewami dla danych powodziowych nie dała sensownych rezultatów gdyż znowu większość Teksasu została zaklasyfikowana jako pustynia.
 """
 
-2+2
-
-
