@@ -60,8 +60,10 @@ def load_anotated(
     spark: SparkSession,
     file_path: Optional[str] = None,
     anotatation_path: Optional[str] = None,
+    year: int = 2023,
+    month: int = 1,
 ) -> SparkDataFrame:
-    data = load_single_month(spark, file_path)
+    data = load_single_month(spark, file_path, year, month)
     if anotatation_path is None:
         anotatation_path = "/content/drive/MyDrive/BigMess/NASA/NASA_an.csv"
     annotations = (
