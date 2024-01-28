@@ -153,7 +153,7 @@ def get_grid(grid_cell_size: float, min_lat: float, max_lat: float,
  xx=np.arange(min_lon, max_lon, step = actual_grid_size)
  yy=np.arange(min_lat, max_lat, step = actual_grid_size)
 
- return(xx, yy)
+ return xx, yy
 
 def block_partition(df: pd.DataFrame, block_size: float, min_lat: float,
                     max_lat: float, min_lon: float, max_lon: float) -> pd.DataFrame :
@@ -207,7 +207,7 @@ def Kfolds(df: pd.DataFrame, k : int, random_state: Optional[int]) -> List[pd.Da
   foldsDF_list = [pd.DataFrame(data=fold_data) for fold_data in folds_data]
   foldsDF_list = [foldDF.drop(columns=['block']) for foldDF in foldsDF_list]
 
-  return(foldsDF_list)
+  return foldsDF_list
 
  min_lat = 25.0625
  max_lat = 52.9375
@@ -1151,7 +1151,7 @@ show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 
 model = SVC(kernel='poly', degree=2, C=0.1, class_weight={1:1.5, 0:1}, gamma='scale', coef0=0.5)
 df_train = July_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
-nasa_07_2021 = pd.DataFrame(nasa2019full[nasa2021full['Month']==7])
+nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==7])
 nasa_fit = nasa_07_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
 labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], 'label': y_pred})
@@ -1161,7 +1161,7 @@ show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 
 model = SVC(C=0.1, class_weight={1:2, 0:1}, gamma='scale')
 df_train = July_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
-nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2019full['Month']==7])
+nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==7])
 nasa_fit = nasa_07_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
 labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], 'label': y_pred})
@@ -1169,10 +1169,9 @@ labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], '
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 
-#sigmoid 	50.00 	None 	0.01 	0.1
 model = SVC(kernel='sigmoid',C=50, class_weight=None, gamma=0.01, coef0=0.1)
 df_train = July_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
-nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2019full['Month']==7])
+nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==7])
 nasa_fit = nasa_07_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
 labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], 'label': y_pred})
