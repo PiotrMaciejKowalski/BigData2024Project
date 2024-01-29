@@ -17,6 +17,8 @@ Original file is located at
 from typing import Optional, Tuple, List
 
 import copy
+from copy import deepcopy
+
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -206,7 +208,7 @@ y = monthly_avg_3_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-rf_monthly_avg_3_july2023 = best_rf.copy()
+rf_monthly_avg_3_july2023 = deepcopy(best_rf)
 rf_monthly_avg_3_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
@@ -237,7 +239,7 @@ show_metrics(rf_monthly_avg_3_july2023, X_test, y_test)
 
 X_train_bal, y_train_bal = BalanceDataSet(X_train, y_train).useSMOTE()
 
-rf_monthly_avg_3_july2023_bal = best_rf.copy()
+rf_monthly_avg_3_july2023_bal = deepcopy(best_rf)
 rf_monthly_avg_3_july2023_bal.fit(X_train_bal, y_train_bal)
 
 show_metrics(rf_monthly_avg_3_july2023_bal, X_train_bal, y_train_bal)
@@ -254,7 +256,7 @@ y = monthly_avg_4_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-rf_monthly_avg_4_july2023 = best_rf.copy()
+rf_monthly_avg_4_july2023 = deepcopy(best_rf)
 rf_monthly_avg_4_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
@@ -287,7 +289,7 @@ y = monthly_avg_5_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-rf_monthly_avg_5_july2023 = best_rf.copy()
+rf_monthly_avg_5_july2023 = deepcopy(best_rf)
 rf_monthly_avg_5_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
@@ -339,7 +341,7 @@ y = monthly_avg_3_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-lgbm_monthly_avg_3_july2023 = best_lgbm.copy()
+lgbm_monthly_avg_3_july2023 = deepcopy(best_lgbm)
 lgbm_monthly_avg_3_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
@@ -369,7 +371,7 @@ show_metrics(lgbm_monthly_avg_3_july2023, X_test, y_test)
 
 X_train_bal, y_train_bal = BalanceDataSet(X_train, y_train).useSMOTE()
 
-lgbm_monthly_avg_3_july2023_bal = best_lgbm.copy()
+lgbm_monthly_avg_3_july2023_bal = deepcopy(best_lgbm)
 lgbm_monthly_avg_3_july2023_bal.fit(X_train_bal, y_train_bal)
 
 show_metrics(lgbm_monthly_avg_3_july2023_bal, X_train_bal, y_train_bal)
@@ -386,7 +388,7 @@ y = monthly_avg_4_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-lgbm_monthly_avg_4_july2023 = best_lgbm.copy()
+lgbm_monthly_avg_4_july2023 = deepcopy(best_lgbm)
 lgbm_monthly_avg_4_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
@@ -419,7 +421,7 @@ y = monthly_avg_5_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-lgbm_monthly_avg_5_july2023 = best_lgbm.copy()
+lgbm_monthly_avg_5_july2023 = deepcopy(best_lgbm)
 lgbm_monthly_avg_5_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
