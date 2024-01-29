@@ -14,53 +14,110 @@ Original file is located at
 !pip install geoviews
 !pip install pyspark
 
-import pandas as pd
-from pandas import DataFrame
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.cluster import KMeans
+from typing import Optional, Tuple, List
+
 import copy
 import warnings
 warnings.filterwarnings('ignore')
+
 import numpy as np
+import matplotlib.pyplot as plt
+import random
+import seaborn as sns
 import matplotlib as mpl
+import pandas as pd
+import pickle
+
+import sklearn
+from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+
+from imblearn.over_sampling import RandomOverSampler, SMOTE
+
 import datashader as ds
 import datashader.transfer_functions as tf
-import colorcet as cc
 import holoviews as hv
-from holoviews.operation.datashader import datashade
 import geoviews as gv
 import geoviews.tile_sources as gts
+from holoviews.operation.datashader import datashade
 from holoviews import opts
+
 from IPython.display import IFrame
 from IPython.core.display import display
-from bokeh.plotting import show, output_notebook
-from sklearn import preprocessing
-from sklearn.mixture import GaussianMixture
-from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, jaccard_score, recall_score, f1_score
-import pickle
-import seaborn as sns
-from sklearn import tree
-from sklearn.metrics import confusion_matrix, classification_report
-from sklearn.model_selection import train_test_split
-from sklearn.feature_selection import mutual_info_classif
-from typing import Optional, Tuple, List
-from imblearn.over_sampling import RandomOverSampler, SMOTE
-from bokeh.layouts import row
-from pyspark.sql.functions import col
-from pyspark.sql.functions import size
-from pyspark.sql import SparkSession
-from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
-from pyspark.sql import Window
-import pyspark
-from sklearn.ensemble import RandomForestClassifier
-import lightgbm as lgb
 
-"""# Załadowanie zbioru danych"""
+from bokeh.plotting import show, output_notebook
+from bokeh.layouts import row
+
+import pyspark
+from pyspark.sql import SparkSession, DataFrame as SparkDataFrame, functions as F, Window
+from pyspark.sql.types import IntegerType, FloatType, StringType, StructType
+
+import lightgbm as lgb
 
 from google.colab import drive
 drive.mount("/content/drive")
+
+"""## Funkcje
+
+Funkcje z notatnika Rafała:
+"""
+
+class BalanceDataSet():
+  '''
+  Two techniques for handling imbalanced data.
+  '''
+  def __init__(
+      self,
+      X: pd.DataFrame,
+      y: pd.DataFrame,
+      random_seed: int = 2023
+      ) -> None:
+      self.X = X
+      self.y = y
+      assert len(self.X)==len(self.y)
+      self.random_seed = random_seed
+      self.oversample = RandomOverSampler(sampling_strategy='auto', random_state=random_seed)
+      self.smote = SMOTE(random_state=random_seed)
+
+  def useOverSampling(
+      self,
+      ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    return self.oversample.fit_resample(self.X, self.y)
+
+  def useSMOTE(
+      self,
+      ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    return self.smote.fit_resample(self.X, self.y)
+
+def summary_model(model: sklearn.base.BaseEstimator, X: pd.DataFrame, y: pd.DataFrame, labels_names: List) -> None:
+  y_pred = model.predict(X)
+  y_real= y
+  cf_matrix = confusion_matrix(y_real, y_pred)
+  group_counts = ["{0:0.0f}".format(value) for value in cf_matrix.flatten()]
+  group_percentages = ["{0:.2%}".format(value) for value in cf_matrix.flatten()/np.sum(cf_matrix)]
+  labels = [f"{v1}\n{v2}" for v1, v2 in zip(group_counts,group_percentages)]
+  labels = np.asarray(labels).reshape(len(labels_names),len(labels_names))
+  sns.heatmap(cf_matrix, annot=labels, fmt='', cmap='Reds',xticklabels=labels_names,yticklabels=labels_names)
+  plt.xlabel('Predykcja')
+  plt.ylabel('Rzeczywistość')
+  plt.show()
+
+"""Funkcja zwracająca cztery metryki oceniające klasyfikator:"""
+
+def show_metrics(model: sklearn.base.BaseEstimator, X: pd.DataFrame, y: pd.DataFrame) -> None:
+  y_pred = model.predict(X)
+#  print("Macierz błędu\n", confusion_matrix(y_true, y_pred), "\n")
+  accuracy = accuracy_score(y, y_pred)
+  print(f"Dokładność (accuracy): {accuracy*100:.2f}%")
+  precision = precision_score(y, y_pred)
+  print(f"Precyzja (precision): {precision*100:.2f}%")
+  recall = recall_score(y, y_pred)
+  print(f"Czułość (recall): {recall*100:.2f}%")
+  f1 = f1_score(y, y_pred)
+  print(f"F1-score: {f1*100:.2f}%")
+
+"""## Sklonowanie repozytorium i import zawartych w nim funkcji"""
 
 !git clone https://github.com/PiotrMaciejKowalski/BigData2024Project.git
 
@@ -71,11 +128,13 @@ import sys
 sys.path.append('/content/BigData2024Project/src')
 
 from start_spark import initialize_spark
-initialize_spark()
 
-from pyspark.sql import SparkSession
 from big_mess.loaders import default_loader
-from pyspark.sql import SparkSession, DataFrame as SparkDataFrame, functions as F
+from agg_classification_eval import overYearMonthStats, plot_comparison, plot_map, show_metrics, prepare_agg_data_for_training
+
+"""# Załadowanie zbioru danych"""
+
+initialize_spark()
 
 spark = SparkSession.builder\
         .master("local")\
@@ -90,319 +149,71 @@ spark = SparkSession.builder\
 
 nasa.createOrReplaceTempView("nasa")
 
-"""# Średnie wieloletnie dla poszczególnych miesięcy"""
+"""# Średnie wieloletnie dla poszczególnych miesięcy
 
-def overYearMonthStats(columns: list, n: int):
-    """
-    Funkcja licząca średnie dla wybranych zmiennych dla danych współrzędnych geograficznych
-    dla każdego z 12 miesięcy od roku w rozważanym pomiarze do n lat wstecz (tj. gdyby n=3, to
-    średnia zostałaby wyliczona z rozważanego roku oraz 3 lat przed nim, czyli w praktyce mielibyśmy
-    średnią z łącznie 4 lat).
-
-    :param columns: lista nazw rozważanych kolumn ze zbioru danych
-    :param n: liczba lat wstecz, z których chcemy wyliczyć średnią
-    """
-
-    if not columns:
-      raise ValueError("Podana musi zostać co najmniej jedna zmienna")
-
-    windowSpec = Window.partitionBy("lon", "lat", "Month").orderBy("Year").rowsBetween(-n, 0)
-
-    nasa_window = nasa
-    for column in columns:
-        average_column_name = "monthly_avg_" + str(n) + "years_" + column
-        nasa_window = nasa_window.withColumn(average_column_name, F.avg(F.col(column)).over(windowSpec))
-
-    return nasa_window
-
-"""Zastosujmy teraz powyższą funkcję na naszym datasecie, dla każdej z rozważanych kolumn pomiarowych, przyjmując n=3:"""
+Zastosujmy teraz funkcję `overYearMonthStats` na naszym datasecie, dla każdej z rozważanych kolumn pomiarowych, przyjmując $n\in\{3, 4, 5\}$ (tj. średnie 3, 4 i 5-letnie). Następnie wyodrębnijmy do oddzielnych dataframe'ów lata $2000$, $2020$, $2022$ oraz $2023$.
+"""
 
 columns_to_avg = ["Rainf", "Evap", "AvgSurfT", "Albedo", "SoilT_40_100cm", "GVEG", "PotEvap", "RootMoist", "SoilM_100_200cm"]
 
-result_df_3 = overYearMonthStats(columns_to_avg, n=3)
-result_df_3.show(15)
-
-"""Wyodrębnijmy teraz kilka lat do oddzielnych dataframe'ów i zapiszmy je:"""
-
-# 2023
-nasa_2023_monthly_avg_3 = result_df_3.filter(f'Year = {2023}')
-pd_2023_monthly_avg_3 = nasa_2023_monthly_avg_3.toPandas()
-
-pd_2023_monthly_avg_3.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/3years/NASA_monthly_avg_2023.csv')
-
-# 2022
-nasa_2022_monthly_avg_3 = result_df_3.filter(f'Year = {2022}')
-pd_2022_monthly_avg_3 = nasa_2022_monthly_avg_3.toPandas()
-
-pd_2022_monthly_avg_3.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/3years/NASA_monthly_avg_2022.csv')
-
-# 2020
-nasa_2020_monthly_avg_3 = result_df_3.filter(f'Year = {2020}')
-pd_2020_monthly_avg_3 = nasa_2020_monthly_avg_3.toPandas()
-
-pd_2020_monthly_avg_3.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/3years/NASA_monthly_avg_2020.csv')
-
-# 2000
-nasa_2000_monthly_avg_3 = result_df_3.filter(f'Year = {2000}')
-pd_2000_monthly_avg_3 = nasa_2000_monthly_avg_3.toPandas()
-
-pd_2000_monthly_avg_3.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/3years/NASA_monthly_avg_2000.csv')
-
-# 1979
-nasa_1979_monthly_avg_3 = result_df_3.filter(f'Year = {1979}')
-pd_1979_monthly_avg_3 = nasa_1979_monthly_avg_3.toPandas()
-
-pd_1979_monthly_avg_3.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/3years/NASA_monthly_avg_1979.csv')
-
-"""Teraz weźmy n=4:"""
-
-result_df_4 = overYearMonthStats(columns_to_avg, n=4)
-result_df_4.show(15)
-
-# 2023
-nasa_2023_monthly_avg_4 = result_df_4.filter(f'Year = {2023}')
-pd_2023_monthly_avg_4 = nasa_2023_monthly_avg_4.toPandas()
-
-pd_2023_monthly_avg_4.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/4years/NASA_monthly_avg_2023.csv')
-
-# 2022
-nasa_2022_monthly_avg_4 = result_df_4.filter(f'Year = {2022}')
-pd_2022_monthly_avg_4 = nasa_2022_monthly_avg_4.toPandas()
-
-pd_2022_monthly_avg_4.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/4years/NASA_monthly_avg_2022.csv')
-
-# 2020
-nasa_2020_monthly_avg_4 = result_df_4.filter(f'Year = {2020}')
-pd_2020_monthly_avg_4 = nasa_2020_monthly_avg_4.toPandas()
-
-pd_2020_monthly_avg_4.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/4years/NASA_monthly_avg_2020.csv')
-
-# 2000
-nasa_2000_monthly_avg_4 = result_df_4.filter(f'Year = {2000}')
-pd_2000_monthly_avg_4 = nasa_2000_monthly_avg_4.toPandas()
-
-pd_2000_monthly_avg_4.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/4years/NASA_monthly_avg_2000.csv')
-
-# 1979
-nasa_1979_monthly_avg_4 = result_df_4.filter(f'Year = {1979}')
-pd_1979_monthly_avg_4 = nasa_1979_monthly_avg_4.toPandas()
-
-pd_1979_monthly_avg_4.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/4years/NASA_monthly_avg_1979.csv')
-
-"""n=5:"""
-
-result_df_5 = overYearMonthStats(columns_to_avg, n=5)
-result_df_5.show(15)
-
-# 2023
-nasa_2023_monthly_avg_5 = result_df_5.filter(f'Year = {2023}')
-pd_2023_monthly_avg_5 = nasa_2023_monthly_avg_5.toPandas()
-
-pd_2023_monthly_avg_5.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/5years/NASA_monthly_avg_2023.csv')
-
-# 2022
-nasa_2022_monthly_avg_5 = result_df_5.filter(f'Year = {2022}')
-pd_2022_monthly_avg_5 = nasa_2022_monthly_avg_5.toPandas()
-
-pd_2022_monthly_avg_5.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/5years/NASA_monthly_avg_2022.csv')
-
-# 2020
-nasa_2020_monthly_avg_5 = result_df_5.filter(f'Year = {2020}')
-pd_2020_monthly_avg_5 = nasa_2020_monthly_avg_5.toPandas()
-
-pd_2020_monthly_avg_5.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/5years/NASA_monthly_avg_2020.csv')
-
-# 2000
-nasa_2000_monthly_avg_5 = result_df_5.filter(f'Year = {2000}')
-pd_2000_monthly_avg_5 = nasa_2000_monthly_avg_5.toPandas()
-
-pd_2000_monthly_avg_5.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/5years/NASA_monthly_avg_2000.csv')
-
-# 1979
-nasa_1979_monthly_avg_5 = result_df_5.filter(f'Year = {1979}')
-pd_1979_monthly_avg_5 = nasa_1979_monthly_avg_5.toPandas()
-
-pd_1979_monthly_avg_5.to_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/5years/NASA_monthly_avg_1979.csv')
+for n in [3, 4, 5]:
+    result_df = overYearMonthStats(nasa, columns_to_avg, n=n)
+    for year in [2023, 2022, 2020, 2000]:
+        filtered_data = result_df.filter(f'Year = {year}')
+        pd_monthly_avg = filtered_data.toPandas()
+        pd_monthly_avg.to_csv(f'/content/drive/MyDrive/BigMess/NASA/monthly_avg/{n}years/NASA_monthly_avg_{year}.csv')
 
 """# Dane do modeli
 
-Zbiór anotowany:
+Z wyodrębnionych zbiorów danych weźmiemy pomiary z lipca 2023, ponieważ na takich trenowane były pierwotne modele. Po zmerge'owaniu ze zbiorem anotowanym, pozostawiamy tylko kolumny ze współrzędnymi, ze średnimi oraz kolumnę 'pustynia' ograniczając się jedynie do stwierdzenia czy dana lokalizacja jest pustynią czy nie.
+
+Zaimportujmy zbiór anotowany:
 """
 
 NASA_sample_an = pd.read_csv('/content/drive/MyDrive/BigMess/NASA/NASA_an.csv', sep=';')
 
-NASA_sample_an
+"""Wyodrębnijmy pożądane dane z uśrednionych zbiorów przy użyciu funkcji `prepare_agg_data_for_training`:"""
 
-"""## Średnie 3-letnie"""
+monthly_avg_3_july2023, monthly_avg_3_july2023_an_merge = prepare_agg_data_for_training(nasa_sample_an=NASA_sample_an, year=2023, month=7, n_years=3)
+monthly_avg_4_july2023, monthly_avg_4_july2023_an_merge = prepare_agg_data_for_training(nasa_sample_an=NASA_sample_an, year=2023, month=7, n_years=4)
+monthly_avg_5_july2023, monthly_avg_5_july2023_an_merge = prepare_agg_data_for_training(nasa_sample_an=NASA_sample_an, year=2023, month=7, n_years=5)
 
-pd_2023_monthly_avg_3 = pd.read_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/3years/NASA_monthly_avg_2023.csv')
-del pd_2023_monthly_avg_3[pd_2023_monthly_avg_3.columns[0]]
+"""## Porównanie na wykresach
 
-monthly_avg_3_july2023 = pd_2023_monthly_avg_3[pd_2023_monthly_avg_3['Month'] == 7]
+Porównamy na wykresach słupkowych wartości rozważanych przez nas zmiennych, w każdym z uśrednionych zbiorów, dla 10 losowo wybranych lokalizacji:
+"""
 
-monthly_avg_3_july2023
+var_list = ['Rainf', 'Evap', 'AvgSurfT', 'Albedo', 'SoilT_40_100cm', 'GVEG', 'PotEvap', 'RootMoist', 'SoilM_100_200cm']
+dfs_to_compare = [monthly_avg_3_july2023_an_merge, monthly_avg_4_july2023_an_merge, monthly_avg_5_july2023_an_merge]
 
-monthly_avg_3_july2023_an_merge = pd_2023_monthly_avg_3.merge(NASA_sample_an, left_on=['lon','lat'], right_on=['lon','lat'], how='inner')
-monthly_avg_3_july2023_an_merge
+for var in var_list:
+  plot_comparison(dfs_to_compare, var)
+  print()
 
-"""Zostawimy tylko kolumny ze współrzędnymi, ze średnimi oraz kolumnę 'pustynia' ograniczając się jedynie do stwierdzenia czy dana lokalizacja jest pustynią czy nie."""
+"""Najbardziej zauważalne różnice między zbiorami można dostrzec w przypadku zmiennej Rainf, reszta wydaje się przyjmować nieco bardziej stabilne wartości średnich kilkuletnich.
 
-# zostawiamy kolumny 'lon', 'lat', 'pustynia' oraz kolumny, których nazwy zaczynają się od "monthly_avg"
-columns_to_leave = ['lon', 'lat', 'pustynia'] + [col for col in monthly_avg_3_july2023_an_merge.columns if col.startswith('monthly_avg')]
-monthly_avg_3_july2023_an_merge = monthly_avg_3_july2023_an_merge[columns_to_leave]
-
-monthly_avg_3_july2023_an_merge
-
-"""## Średnie 4-letnie"""
-
-pd_2023_monthly_avg_4 = pd.read_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/4years/NASA_monthly_avg_2023.csv')
-del pd_2023_monthly_avg_4[pd_2023_monthly_avg_4.columns[0]]
-
-monthly_avg_4_july2023 = pd_2023_monthly_avg_4[pd_2023_monthly_avg_4['Month'] == 7]
-
-monthly_avg_4_july2023
-
-monthly_avg_4_july2023_an_merge = pd_2023_monthly_avg_4.merge(NASA_sample_an, left_on=['lon','lat'], right_on=['lon','lat'], how='inner')
-monthly_avg_4_july2023_an_merge
-
-"""Zostawimy tylko kolumny ze współrzędnymi, ze średnimi oraz kolumnę 'pustynia' ograniczając się jedynie do stwierdzenia czy dana lokalizacja jest pustynią czy nie."""
-
-# zostawiamy kolumny 'lon', 'lat', 'pustynia' oraz kolumny, których nazwy zaczynają się od "monthly_avg"
-columns_to_leave = ['lon', 'lat', 'pustynia'] + [col for col in monthly_avg_4_july2023_an_merge.columns if col.startswith('monthly_avg')]
-monthly_avg_4_july2023_an_merge = monthly_avg_4_july2023_an_merge[columns_to_leave]
-
-monthly_avg_4_july2023_an_merge
-
-"""## Średnie 5-letnie"""
-
-pd_2023_monthly_avg_5 = pd.read_csv('/content/drive/MyDrive/BigMess/NASA/monthly_avg/5years/NASA_monthly_avg_2023.csv')
-del pd_2023_monthly_avg_5[pd_2023_monthly_avg_5.columns[0]]
-
-monthly_avg_5_july2023 = pd_2023_monthly_avg_5[pd_2023_monthly_avg_5['Month'] == 7]
-
-monthly_avg_5_july2023
-
-monthly_avg_5_july2023_an_merge = pd_2023_monthly_avg_5.merge(NASA_sample_an, left_on=['lon','lat'], right_on=['lon','lat'], how='inner')
-monthly_avg_5_july2023_an_merge
-
-"""Zostawimy tylko kolumny ze współrzędnymi, ze średnimi oraz kolumnę 'pustynia' ograniczając się jedynie do stwierdzenia czy dana lokalizacja jest pustynią czy nie."""
-
-# zostawiamy kolumny 'lon', 'lat', 'pustynia' oraz kolumny, których nazwy zaczynają się od "monthly_avg"
-columns_to_leave = ['lon', 'lat', 'pustynia'] + [col for col in monthly_avg_5_july2023_an_merge.columns if col.startswith('monthly_avg')]
-monthly_avg_5_july2023_an_merge = monthly_avg_5_july2023_an_merge[columns_to_leave]
-
-monthly_avg_5_july2023_an_merge
-
-"""## Funkcje"""
-
-# balansowanie zbioru danych z notatnika Rafała
-class BalanceDataSet():
-  '''
-  Two techniques for handling imbalanced data.
-  '''
-  def __init__(
-      self,
-      X: DataFrame,
-      y: DataFrame
-      ) -> None:
-      self.X = X
-      self.y = y
-      assert len(self.X)==len(self.y)
-
-  def useOverSampling(
-      self,
-      randon_seed: Optional[int] = 2023
-      ) -> Tuple[DataFrame, DataFrame]:
-    oversample = RandomOverSampler( sampling_strategy='auto',
-                  random_state=randon_seed)
-    return oversample.fit_resample(self.X, self.y)
-
-  def useSMOTE(
-      self,
-      randon_seed: Optional[int] = 2023
-      ) -> Tuple[DataFrame, DataFrame]:
-    smote = SMOTE(random_state=randon_seed)
-    return smote.fit_resample(self.X, self.y)
-
-def summary_model(model, X:pd.DataFrame, y:pd.DataFrame, labels_names: List) -> None:
-  y_pred = model.predict(X)
-  y_real= y
-  cf_matrix = confusion_matrix(y_real, y_pred)
-  group_counts = ["{0:0.0f}".format(value) for value in cf_matrix.flatten()]
-  group_percentages = ["{0:.2%}".format(value) for value in cf_matrix.flatten()/np.sum(cf_matrix)]
-  labels = [f"{v1}\n{v2}" for v1, v2 in zip(group_counts,group_percentages)]
-  labels = np.asarray(labels).reshape(len(labels_names),len(labels_names))
-  sns.heatmap(cf_matrix, annot=labels, fmt='', cmap='Reds',xticklabels=labels_names,yticklabels=labels_names)
-  plt.xlabel('Predykcja')
-  plt.ylabel('Rzeczywistość')
-  plt.show()
-
-def print_classification_report(model, X: pd.DataFrame, y: pd.DataFrame) -> None:
-  y_predict = model.predict(X)
-  print(classification_report(y, y_predict))
-
-def show_metrics(model, X: pd.DataFrame, y: pd.DataFrame) -> None:
-  y_pred = model.predict(X)
-#  print("Macierz błędu\n", confusion_matrix(y_true, y_pred), "\n")
-  accuracy = accuracy_score(y, y_pred)
-  print(f"Dokładność (accuracy): {accuracy*100:.2f}%")
-  precision = precision_score(y, y_pred)
-  print(f"Precyzja (precision): {precision*100:.2f}%")
-  recall = recall_score(y, y_pred)
-  print(f"Czułość (recall): {recall*100:.2f}%")
-  f1 = f1_score(y, y_pred)
-  print(f"F1-score: {f1*100:.2f}%")
-
-def plot_map(df: pd.DataFrame, parameter_name: str, colormap: mpl.colors.LinearSegmentedColormap,
-             title: str, point_size: int = 8, width: int = 900, height: int = 600, alpha: float = 1,
-             bgcolor: str = 'white'):
-
-    gdf = gv.Points(df, ['lon', 'lat'], [parameter_name]) # obiekt zawierający punkty
-    tiles = gts.OSM # wybór mapy tła, w tym wypadku OpenStreetMap
-
-    # łączenie mapy tła z punktami i ustawienie wybranych parametrów wizualizacji
-    map_with_points = tiles * gdf.opts(
-        title=title,
-        color=parameter_name,
-        cmap=colormap,
-        size=point_size,
-        width=width,
-        height=height,
-        colorbar=True,
-        toolbar='above',
-        tools=['hover', 'wheel_zoom', 'reset'],
-        alpha=alpha, # przezroczystość
-        bgcolor=bgcolor
-    )
-
-    map_with_points.opts(bgcolor=bgcolor)
-
-#    # zapis mapy do pliku .html
-#    output_filename = f'/content/drive/MyDrive/BigMess/NASA/output_map_{parameter_name}.html'
-#    hv.save(map_with_points, output_filename)
-
-    return hv.render(map_with_points)
-
-"""# Las losowy
+# Las losowy
 
 ## Trening i test modelu przy użyciu nowych danych i zbioru anotowanego
-
-### Średnie 3-letnie
 """
+
+best_rf = RandomForestClassifier(max_depth=8, min_samples_leaf=4, n_estimators=70, random_state=3)
+
+"""### Średnie 3-letnie"""
 
 X = monthly_avg_3_july2023_an_merge.drop(columns=['lon', 'lat', 'pustynia'])
 y = monthly_avg_3_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-rf_monthly_avg_3_july2023 = RandomForestClassifier(max_depth=8, min_samples_leaf=4, n_estimators=70, random_state=3)
-
+rf_monthly_avg_3_july2023 = best_rf.copy()
 rf_monthly_avg_3_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
 
 monthly_avg_3_july2023_pred = monthly_avg_3_july2023.copy()
-monthly_avg_3_july2023_pred['pustynia'] = rf_monthly_avg_3_july2023.predict(monthly_avg_3_july2023.loc[:, [col for col in monthly_avg_3_july2023.columns if col.startswith('monthly_avg')]])
+monthly_avg_3_july2023_pred['pustynia'] = rf_monthly_avg_3_july2023.predict(
+    monthly_avg_3_july2023.loc[:, [col for col in monthly_avg_3_july2023.columns if col.startswith('monthly_avg')]])
 
 output_notebook()
 show(plot_map(df=monthly_avg_3_july2023_pred, parameter_name='pustynia',
@@ -414,15 +225,11 @@ show(plot_map(df=monthly_avg_3_july2023_pred, parameter_name='pustynia',
 
 summary_model(rf_monthly_avg_3_july2023, X_train, y_train, ['0','1'])
 
-print_classification_report(rf_monthly_avg_3_july2023, X_train, y_train)
-
 show_metrics(rf_monthly_avg_3_july2023, X_train, y_train)
 
 """##### Ocena na zbiorze testowym"""
 
 summary_model(rf_monthly_avg_3_july2023, X_test, y_test, ['0', '1'])
-
-print_classification_report(rf_monthly_avg_3_july2023, X_test, y_test)
 
 show_metrics(rf_monthly_avg_3_july2023, X_test, y_test)
 
@@ -430,15 +237,10 @@ show_metrics(rf_monthly_avg_3_july2023, X_test, y_test)
 
 X_train_bal, y_train_bal = BalanceDataSet(X_train, y_train).useSMOTE()
 
-rf_monthly_avg_3_july2023_bal = RandomForestClassifier(max_depth=8, min_samples_leaf=4, n_estimators=70, random_state=3)
-
+rf_monthly_avg_3_july2023_bal = best_rf.copy()
 rf_monthly_avg_3_july2023_bal.fit(X_train_bal, y_train_bal)
 
-print_classification_report(rf_monthly_avg_3_july2023_bal, X_train_bal, y_train_bal)
-
 show_metrics(rf_monthly_avg_3_july2023_bal, X_train_bal, y_train_bal)
-
-print_classification_report(rf_monthly_avg_3_july2023_bal, X_test, y_test)
 
 show_metrics(rf_monthly_avg_3_july2023_bal, X_test, y_test)
 
@@ -452,8 +254,7 @@ y = monthly_avg_4_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-rf_monthly_avg_4_july2023 = RandomForestClassifier(max_depth=8, min_samples_leaf=4, n_estimators=70, random_state=3)
-
+rf_monthly_avg_4_july2023 = best_rf.copy()
 rf_monthly_avg_4_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
@@ -471,15 +272,11 @@ show(plot_map(df=monthly_avg_4_july2023_pred, parameter_name='pustynia',
 
 summary_model(rf_monthly_avg_4_july2023, X_train, y_train, ['0','1'])
 
-print_classification_report(rf_monthly_avg_4_july2023, X_train, y_train)
-
 show_metrics(rf_monthly_avg_4_july2023, X_train, y_train)
 
 """##### Ocena na zbiorze testowym"""
 
 summary_model(rf_monthly_avg_4_july2023, X_test, y_test, ['0', '1'])
-
-print_classification_report(rf_monthly_avg_4_july2023, X_test, y_test)
 
 show_metrics(rf_monthly_avg_4_july2023, X_test, y_test)
 
@@ -490,8 +287,7 @@ y = monthly_avg_5_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-rf_monthly_avg_5_july2023 = RandomForestClassifier(max_depth=8, min_samples_leaf=4, n_estimators=70, random_state=3)
-
+rf_monthly_avg_5_july2023 = best_rf.copy()
 rf_monthly_avg_5_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
@@ -509,15 +305,11 @@ show(plot_map(df=monthly_avg_5_july2023_pred, parameter_name='pustynia',
 
 summary_model(rf_monthly_avg_5_july2023, X_train, y_train, ['0','1'])
 
-print_classification_report(rf_monthly_avg_5_july2023, X_train, y_train)
-
 show_metrics(rf_monthly_avg_5_july2023, X_train, y_train)
 
 """##### Ocena na zbiorze testowym"""
 
 summary_model(rf_monthly_avg_5_july2023, X_test, y_test, ['0', '1'])
-
-print_classification_report(rf_monthly_avg_5_july2023, X_test, y_test)
 
 show_metrics(rf_monthly_avg_5_july2023, X_test, y_test)
 
@@ -525,20 +317,29 @@ show_metrics(rf_monthly_avg_5_july2023, X_test, y_test)
 
 Wszystkie trzy modele na zbiorze testowym wypadają niemalże identycznie. Gdyby już musieć wybrać najlepszy model to byłby to model wytrenowany na 5-letnich średnich dla miesięcy, ale występujące w metrykach klasyfikacji różnice są zupełnie nieznaczne.
 
-# LGBM
+### Zapisanie najlepszego modelu
+"""
+
+import pickle
+best_rf_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Modele_kilkuletnia_agregacja/random_forest_5years_avg_july2023'
+with open(best_rf_path, 'wb') as files:
+  pickle.dump(rf_monthly_avg_5_july2023, files)
+
+"""# LGBM
 
 ## Trening i test modelu przy użyciu nowych danych i zbioru anotowanego
-
-### Średnie 3-letnie
 """
+
+best_lgbm = lgb.LGBMClassifier(max_depth=10, n_estimators=120, num_leaves=30, random_state=3)
+
+"""### Średnie 3-letnie"""
 
 X = monthly_avg_3_july2023_an_merge.drop(columns=['lon', 'lat', 'pustynia'])
 y = monthly_avg_3_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-lgbm_monthly_avg_3_july2023 = lgb.LGBMClassifier(max_depth=10, n_estimators=120, num_leaves=30, random_state=3)
-
+lgbm_monthly_avg_3_july2023 = best_lgbm.copy()
 lgbm_monthly_avg_3_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
@@ -556,15 +357,11 @@ show(plot_map(df=monthly_avg_3_july2023_pred_lgbm, parameter_name='pustynia',
 
 summary_model(lgbm_monthly_avg_3_july2023, X_train, y_train, ['0','1'])
 
-print_classification_report(lgbm_monthly_avg_3_july2023, X_train, y_train)
-
 show_metrics(lgbm_monthly_avg_3_july2023, X_train, y_train)
 
 """##### Ocena na zbiorze testowym"""
 
 summary_model(lgbm_monthly_avg_3_july2023, X_test, y_test, ['0', '1'])
-
-print_classification_report(lgbm_monthly_avg_3_july2023, X_test, y_test)
 
 show_metrics(lgbm_monthly_avg_3_july2023, X_test, y_test)
 
@@ -572,15 +369,10 @@ show_metrics(lgbm_monthly_avg_3_july2023, X_test, y_test)
 
 X_train_bal, y_train_bal = BalanceDataSet(X_train, y_train).useSMOTE()
 
-lgbm_monthly_avg_3_july2023_bal = lgb.LGBMClassifier(max_depth=10, n_estimators=120, num_leaves=30, random_state=3)
-
+lgbm_monthly_avg_3_july2023_bal = best_lgbm.copy()
 lgbm_monthly_avg_3_july2023_bal.fit(X_train_bal, y_train_bal)
 
-print_classification_report(lgbm_monthly_avg_3_july2023_bal, X_train_bal, y_train_bal)
-
 show_metrics(lgbm_monthly_avg_3_july2023_bal, X_train_bal, y_train_bal)
-
-print_classification_report(lgbm_monthly_avg_3_july2023_bal, X_test, y_test)
 
 show_metrics(lgbm_monthly_avg_3_july2023_bal, X_test, y_test)
 
@@ -594,8 +386,7 @@ y = monthly_avg_4_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-lgbm_monthly_avg_4_july2023 = lgb.LGBMClassifier(max_depth=10, n_estimators=120, num_leaves=30, random_state=3)
-
+lgbm_monthly_avg_4_july2023 = best_lgbm.copy()
 lgbm_monthly_avg_4_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
@@ -613,15 +404,11 @@ show(plot_map(df=monthly_avg_4_july2023_pred_lgbm, parameter_name='pustynia',
 
 summary_model(lgbm_monthly_avg_4_july2023, X_train, y_train, ['0','1'])
 
-print_classification_report(lgbm_monthly_avg_4_july2023, X_train, y_train)
-
 show_metrics(lgbm_monthly_avg_4_july2023, X_train, y_train)
 
 """##### Ocena na zbiorze testowym"""
 
 summary_model(lgbm_monthly_avg_4_july2023, X_test, y_test, ['0', '1'])
-
-print_classification_report(lgbm_monthly_avg_4_july2023, X_test, y_test)
 
 show_metrics(lgbm_monthly_avg_4_july2023, X_test, y_test)
 
@@ -632,8 +419,7 @@ y = monthly_avg_5_july2023_an_merge['pustynia']
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=2023)
 
-lgbm_monthly_avg_5_july2023 = lgb.LGBMClassifier(max_depth=10, n_estimators=120, num_leaves=30, random_state=3)
-
+lgbm_monthly_avg_5_july2023 = best_lgbm.copy()
 lgbm_monthly_avg_5_july2023.fit(X_train, y_train)
 
 """Zastosujmy model na pełnych danych:"""
@@ -651,19 +437,22 @@ show(plot_map(df=monthly_avg_5_july2023_pred_lgbm, parameter_name='pustynia',
 
 summary_model(lgbm_monthly_avg_5_july2023, X_train, y_train, ['0','1'])
 
-print_classification_report(lgbm_monthly_avg_5_july2023, X_train, y_train)
-
 show_metrics(lgbm_monthly_avg_5_july2023, X_train, y_train)
 
 """##### Ocena na zbiorze testowym"""
 
 summary_model(lgbm_monthly_avg_5_july2023, X_test, y_test, ['0', '1'])
 
-print_classification_report(lgbm_monthly_avg_5_july2023, X_test, y_test)
-
 show_metrics(lgbm_monthly_avg_5_july2023, X_test, y_test)
 
 """## Wnioski
 
 Otrzymane modele są lepsze niż wytrenowane wcześniej lasy losowe. Zarówno dla danych treningowych, jak i testowych otrzymujemy lepsze wyniki. Ogólnie, wszystkie trzy modele na zbiorze testowym wypadają bardzo podobnie do siebie. Model wytrenowany na 5-letnich średnich dla miesięcy wydaje się być najmniej precyzyjny, w tym wypadku najlepszy wynik mamy dla 4-letnich średnich. Podsumowując wszystkie metryki klasyfikacji, najlepszym modelem jest model ze średnimi 4-letnimi.
+
+### Zapisanie najlepszego modelu
 """
+
+import pickle
+best_lgbm_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Modele_kilkuletnia_agregacja/lgbm_4years_avg_july2023'
+with open(best_lgbm_path, 'wb') as files:
+  pickle.dump(lgbm_monthly_avg_4_july2023, files)
