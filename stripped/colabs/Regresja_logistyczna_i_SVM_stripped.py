@@ -804,7 +804,7 @@ nasa2019full = nasa_full_2019.toPandas()
 
 nasa2021full = nasa_full_2021.toPandas()
 
-def train_and_predict(model: BaseEstimator, df_train: pd.DataFrame, df_fit: pd.DataFrame, label_column_name: str, proba: Optional[bool]=False) -> np.ndarray:
+def train_and_predict(model: BaseEstimator, df_train: pd.DataFrame, df_fit: pd.DataFrame, label_column_name: str, proba: bool=False) -> np.ndarray:
 
   y_train = df_train[label_column_name]
   X_train = data_standarization(df_train.drop(columns=[label_column_name]))
