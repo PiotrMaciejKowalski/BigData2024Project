@@ -1062,12 +1062,12 @@ folds_07_2019_stand = [data_standarization(fold) for fold in folds_July_2019]
 param_grid = {'penalty': ['l2'],
               'class_weight': [None, 'balanced', {1:2, 0:1}, {1:1.5, 0:1}],
               'solver': ['sag', 'saga', 'newton-cholesky', 'lbfgs'],
-              'C':[200, 100, 20, 10, 1.5, 1, 0.8, 0.5, 0.1, 0.01] }
+              'C':[200, 100, 20, 10, 1.5, 1, 0.8, 0.5, 0.1, 0.01]}
 
 param_grid2 = {'penalty': ['l1'],
               'class_weight': [None, 'balanced', {1:2, 0:1}, {1:1.5, 0:1}],
               'solver': ['liblinear', 'saga'],
-              'C':[200, 100, 20, 10, 1.5, 1, 0.8, 0.5, 0.1, 0.01] }
+              'C':[200, 100, 20, 10, 1.5, 1, 0.8, 0.5, 0.1, 0.01]}
 
 
 # In[ ]:
@@ -2102,7 +2102,7 @@ show(plot_map(df=labels, parameter_name='label', colormap=colormap, colorbar=Tru
 
 # # **Maszyny wektorów nośnych - SVM**
 
-# In[1]:
+# In[ ]:
 
 
 def GridSearchCV_SVM(folds: np.ndarray, folds_labels: List[List[int]], param_grid: dict, kernel: str) -> pd.DataFrame:
@@ -2124,7 +2124,7 @@ def GridSearchCV_SVM(folds: np.ndarray, folds_labels: List[List[int]], param_gri
                                intercept_scaling = intercept_scal, max_iter = 100000, random_state=13)
          else:
                  model = LinearSVC(C=C, penalty=penalty, class_weight= class_weight, loss=loss, dual= False,
-                               intercept_scaling = intercept_scal, max_iter = 50000, random_state=13)
+                               intercept_scaling = intercept_scal, max_iter = 10000, random_state=13)
          results = {'kernel': 'linear', 'penalty': penalty, 'C': C, 'class_weight': class_weight,
                     'loss': loss, 'intercept_scal': intercept_scal}
          crossval_results = Kfolds_crossvalidation(model, folds, folds_labels)
@@ -2139,7 +2139,7 @@ def GridSearchCV_SVM(folds: np.ndarray, folds_labels: List[List[int]], param_gri
       all_res.update(metrics)
       hyperparameters = [dict(zip(param_grid.keys(), values)) for values in product(*param_grid.values())]
       for hyperparams in hyperparameters:
-         model = SVC(**hyperparams)
+         model = SVC(**hyperparams, max_iter=10000)
          results = hyperparams
          results['kernel'] = kernel
          crossval_results = Kfolds_crossvalidation(model, folds, folds_labels)
@@ -2150,16 +2150,16 @@ def GridSearchCV_SVM(folds: np.ndarray, folds_labels: List[List[int]], param_gri
  return pd.DataFrame(data=all_res)
 
 
-# * ## **Linear kernel**
+#  ## **Linear kernel**
 
 # In[ ]:
 
 
-param_grid_linear = { 'penalty': ['l1', 'l2'],
-               'C': [0.01, 0.1, 0.5, 0.8, 1, 5, 10, 50, 100],
-               'loss': ['squared_hinge'],                           #with loss='hinge' convergence issues occurred
-               'class_weight': [None, 'balanced', {1:1.5, 0:1}],
-               'intercept_scal': [0.1, 1, 1.5, 5, 10, 50]}
+param_grid_linear = {'penalty': ['l1', 'l2'],
+                     'C': [0.01, 0.1, 0.5, 0.8, 1, 5, 10, 50, 100],
+                     'loss': ['squared_hinge'],                           #with loss='hinge' convergence issues occurred
+                     'class_weight': [None, 'balanced', {1:1.5, 0:1}],
+                     'intercept_scal': [0.1, 1, 1.5, 5, 10, 50]}
 
 
 # **Dane z lipca**
@@ -2236,10 +2236,10 @@ linear_results3.sort_values(by=['accuracy', 'precision'], ascending=False)
 # In[ ]:
 
 
-param_grid_poly = {'C': [0.01, 0.1, 0.5, 0.8, 1, 10, 50],
-              'class_weight': [None, 'balanced', {1:1.5, 0:1}],
-              'gamma': ['scale', 'auto', 0.001, 0.01, 0.1, 1, 10, 100],
-              'degree': [2, 3], 'coef0': [0, 0.1, 0.5, 1]}
+param_grid_poly = {'C': [0.001, 0.01, 0.1, 0.5, 0.8, 1, 10, 50],
+                   'class_weight': [None, 'balanced', {1:1.5, 0:1}],
+                   'gamma': ['scale', 'auto', 0.001, 0.01, 0.1, 1, 10, 100],
+                   'degree': [2, 3], 'coef0': [0, 0.1, 0.5, 1]}
 
 
 # **Dane z lipca**
@@ -2262,8 +2262,8 @@ poly_results.sort_values(by=['accuracy', 'precision'], ascending=False)
 
 
 param_grid_rbf = {'C': [0.001, 0.01, 0.1, 0.5, 0.8, 1, 1.5, 5, 10, 20, 50],
-              'class_weight': [None, 'balanced', {1:1.5, 0:1}, {1:2, 0:1}],
-              'gamma': ['scale', 'auto', 0.001, 0.01, 0.1, 1, 10, 100] }
+                  'class_weight': [None, 'balanced', {1:1.5, 0:1}, {1:2, 0:1}],
+                  'gamma': ['scale', 'auto', 0.001, 0.01, 0.1, 1, 10, 100]}
 
 
 # **Dane z lipca**
@@ -2314,9 +2314,9 @@ rbf_results3.sort_values(by=['accuracy', 'precision', 'recall'], ascending=False
 
 
 param_grid_sigm = {'C': [0.001, 0.01, 0.1, 0.5, 0.8, 1, 1.5, 5, 10, 20, 50],
-              'class_weight': [None, 'balanced', {1:1.5, 0:1}, {1:2, 0:1}],
-              'gamma': ['scale', 'auto', 0.001, 0.01, 0.1, 1, 10, 100],
-               'coef0': [0, 0.1, 0.5, 1]}
+                   'class_weight': [None, 'balanced', {1:1.5, 0:1}, {1:2, 0:1}],
+                   'gamma': ['scale', 'auto', 0.001, 0.01, 0.1, 1, 10, 100],
+                   'coef0': [0, 0.1, 0.5, 1]}
 
 
 # **Dane z lipca**
@@ -2376,12 +2376,12 @@ show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 
 # * **SVM z polynomial kernel dla danych z lipca 2019 (predykcje na danych z lipca 2021)**
 # 
-# * z parametrami: degree=**2** , C=**10** , class_weight={1:2, 0:1} , 	gamma =0.01 ,	coef0= **0**
+# * z parametrami: degree=**2** , C=**0.001** , class_weight={1:1.5, 0:1} , 	gamma =10 ,	coef0= **0.5**
 
 # In[ ]:
 
 
-model = SVC(kernel='poly', degree=2, C=10, class_weight={1:2, 0:1}, gamma=0.01, coef0=0)
+model = SVC(kernel='poly', degree=2, C=0.001, class_weight={1:1.5, 0:1}, gamma=10, coef0=0.5)
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
 labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], 'label': y_pred})
 
@@ -2400,7 +2400,7 @@ show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 # In[ ]:
 
 
-model = SVC(C=0.1, class_weight={1:2, 0:1}, gamma='scale')
+model = SVC(kernel='rbf', C=0.1, class_weight={1:2, 0:1}, gamma='scale')
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
 labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], 'label': y_pred})
 
@@ -2419,7 +2419,7 @@ show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 # In[ ]:
 
 
-model = SVC(C=10, class_weight={1:1.5, 0:1}, gamma=0.01)
+model = SVC(kernel='rbf', C=10, class_weight={1:1.5, 0:1}, gamma=0.01)
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
 labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], 'label': y_pred})
 
@@ -2431,14 +2431,13 @@ output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 
 
-# * **SVM z sigmoid kernel dla danych z lipca ((predykcje na danych z lipca 2021)**
-# 
-# * z parametrami: C=**10** ,  class_weight=None , gamma=**0.01**, coef0=0.5
+# * **SVM z sigmoid kernel dla danych z lipca (predykcje na danych z lipca 2021)**
+# * z parametrami: C=**50** ,  class_weight=None , gamma=**0.01**, coef0=0
 
 # In[ ]:
 
 
-model = SVC(kernel='sigmoid',C=10, class_weight={1:1.5, 0:1}, gamma=0.01, coef0=0.5)
+model = SVC(kernel='sigmoid',C=50, class_weight=None, gamma=0.01, coef0=0)
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
 labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], 'label': y_pred})
 
