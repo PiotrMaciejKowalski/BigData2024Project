@@ -35,6 +35,7 @@ import sys
 sys.path.append('/content/BigData2024Project/src')
 
 from typing import List, Tuple, Optional
+from itertools import product
 import copy
 import math
 import random
@@ -43,7 +44,6 @@ import matplotlib as mpl
 import pandas as pd
 from scipy import stats
 import seaborn as sns
-import statsmodels.stats.multicomp
 import statsmodels.api as sm
 from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
@@ -51,7 +51,7 @@ from statistics import mean
 import matplotlib.pyplot as plt
 from sklearn import preprocessing
 from sklearn.metrics import accuracy_score, precision_score, jaccard_score, recall_score
-from sklearn.metrics import roc_auc_score, precision_recall_curve, auc
+from sklearn.metrics import roc_auc_score, precision_recall_curve
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC, SVC
 from sklearn.base import BaseEstimator
@@ -137,8 +137,8 @@ December_2019_DF.reset_index(inplace=True, drop=True)
 December_2021_DF = pd.DataFrame(data = nasa_2021_an[nasa_2021_an['Month']==12])
 December_2021_DF.reset_index(inplace=True, drop=True)
 
-#Funkcja do generowania podziału na foldy do crosswalidacji blokowej (spatial block crossvalidation)
-#kod ze sprintu 1 musiałam zaadaptować pod Pandasa
+#Funkcja do generowania podzialu na foldy do crosswalidacji blokowej (spatial block crossvalidation)
+#kod ze sprintu 1 musiałam zaadaptowac pod Pandasa
 
 
 def get_grid(grid_cell_size: float, min_lat: float, max_lat: float,
@@ -164,9 +164,9 @@ def block_partition(df: pd.DataFrame, block_size: float, min_lat: float,
   xx, yy = get_grid(block_size, min_lat, max_lat, min_lon, max_lon)
 
   block_count = 0
-  for y in range(len(yy)-1):
-    for x in range(len(xx)-1):
-      block = df[(xx[x]<=df['lon']) & (df['lon'] <= xx[x+1]) & ( yy[y]<= df['lat']) & (df['lat'] <= yy[y+1])]
+  for y_low, y_high in zip(yy[:-1], yy[1:]):
+    for x_low, x_high in zip(xx[:-1], xx[1:]):
+      block = df[(x_low<=df['lon']) & (df['lon'] <= x_high) & ( y_low<= df['lat']) & (df['lat'] <= y_high)]
       if len(block)>0:    #checking if block is non-empty
          block_number[list(block.index)] = block_count
          block_count+=1
@@ -184,11 +184,12 @@ def Kfolds(df: pd.DataFrame, k : int, random_state: Optional[int]) -> List[pd.Da
   reminder = len(blocks)%k
   folds=[]
 
+  if random_state:
+    random.seed(random_state)
+
   for i in range(k):
       fold = []
       for j in range(n):
-          if random_state:
-             random.seed(random_state)
           r = random.randint(0, len(blocks_list)-1)
           fold.append(blocks_list[r])
           blocks_list.remove(blocks_list[r])
@@ -196,16 +197,12 @@ def Kfolds(df: pd.DataFrame, k : int, random_state: Optional[int]) -> List[pd.Da
 
   if reminder!=0:
      for b in blocks_list:
-        if random_state:
-           random.seed(random_state)
         n_fol = random.randint(0, k-1)
         folds[n_fol].append(b)
         blocks_list.remove(b)
 
-  foldsDF_list = []
-  folds_data = [df[df['block'].isin(fold)] for fold in folds]
-  foldsDF_list = [pd.DataFrame(data=fold_data) for fold_data in folds_data]
-  foldsDF_list = [foldDF.drop(columns=['block']) for foldDF in foldsDF_list]
+  foldsDF_list = [df[df['block'].isin(fold)] for fold in folds]
+  foldsDF_list = [pd.DataFrame(data=fold_data).drop(columns=['block']) for fold_data in foldsDF_list]
 
   return foldsDF_list
 
@@ -215,17 +212,19 @@ def Kfolds(df: pd.DataFrame, k : int, random_state: Optional[int]) -> List[pd.Da
  max_lon = -67.0625
 
 blocks = block_partition(July_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds = Kfolds(blocks, 6, random_state=3)
+folds = Kfolds(blocks, 6, random_state=333)
 
 for f in folds:
   print(len(f))
-  print(len(f[f['pustynia']==1]))          #dla random_state=3 otrzymujemy podział z rozsadna iloscia pustyn w kazdym foldzie
+  print(len(f[f['pustynia']==1]))          #dla random_state=333 otrzymujemy podział z rozsadna iloscia pustyn w kazdym foldzie
 
-def test_for_residuals_normality(df: pd.DataFrame, column_name:str):
+def test_for_residuals_normality(df: pd.DataFrame, column_name:str, label_name: str='pustynia', labels: List[int]=[1,0]) -> None:
 
-  r1 = df[df['pustynia']==1][column_name] - df[df['pustynia']==1][column_name].mean()
-  r2 = df[df['pustynia']==0][column_name] - df[df['pustynia']==0][column_name].mean()
-  x = list(r1) + list(r2)
+  x = []
+  for label in labels:
+    r = df[df[label_name]==label][column_name] - df[df[label_name]==label][column_name].mean()
+    x += list(r)
+
   shapiro = stats.shapiro(x)
   print(shapiro)
   sm.qqplot(np.array(x), line='s')
@@ -245,27 +244,25 @@ def OLS_report_and_ANOVA(df: pd.DataFrame, group_column_name: str, feature_colum
   print (anova)
 
 
-def plot_density(df: pd.DataFrame, group_column_name: str, feature_column_name: str, random_state: Optional[int]=13) -> None:
+def plot_density(df: pd.DataFrame, group_column_name: str, feature_column_name: str, label_for_desert: int=1, sample_size: int=50, random_state: int=13) -> None:
 
-  df_groups = pd.DataFrame({'Desert': df[df[group_column_name]==1][feature_column_name],
-                 'Non-desert': df[df[group_column_name]==0][feature_column_name]})
+  df_groups = pd.DataFrame({'Desert': df[df[group_column_name]==label_for_desert][feature_column_name],
+                 'Non-desert': df[df[group_column_name]!=label_for_desert][feature_column_name]})
   random.seed(random_state)
-  desert_sample = random.sample(list(df_groups['Desert'].dropna()), 50)
-  random.seed(random_state)
-  nondesert_sample = random.sample(list(df_groups['Non-desert'].dropna()), 50)
+  desert_sample = random.sample(list(df_groups['Desert'].dropna()), sample_size)
+  nondesert_sample = random.sample(list(df_groups['Non-desert'].dropna()), sample_size)
 
   samples = pd.DataFrame({'Desert': desert_sample, 'Non-desert': nondesert_sample})
   samples.plot.density()
 
 
-def perform_Kruskal_Wallis(df: pd.DataFrame, group_column_name:str, feature_column_name: str, random_state: Optional[int] =13) -> None:
+def perform_Kruskal_Wallis(df: pd.DataFrame, group_column_name:str, feature_column_name: str, label_for_desert: int=1, sample_size: int=100, random_state: int=13) -> None:
 
-  df_groups = pd.DataFrame({'Desert': df[summer_data[group_column_name]==1][feature_column_name],
-                 'Non-desert': df[summer_data[group_column_name]==0][feature_column_name]})
+  df_groups = pd.DataFrame({'Desert': df[df[group_column_name]==label_for_desert][feature_column_name],
+                 'Non-desert': df[df[group_column_name]!=label_for_desert][feature_column_name]})
   random.seed(random_state)
-  desert_sample = random.sample(list(df_groups['Desert'].dropna()), 100)
-  random.seed(random_state)
-  nondes_sample = random.sample(list(df_groups['Non-desert'].dropna()), 100)
+  desert_sample = random.sample(list(df_groups['Desert'].dropna()), sample_size)
+  nondes_sample = random.sample(list(df_groups['Non-desert'].dropna()), sample_size)
 
   print(stats.kruskal(desert_sample, nondes_sample))
 
@@ -279,7 +276,7 @@ plot_density(summer_data, 'pustynia', 'Rainf', random_state=13)
 
 OLS_report_and_ANOVA(summer_data, 'pustynia', 'Rainf')
 
-perform_Kruskal_Wallis(summer_data, 'pustynia', 'Rainf', 13)
+perform_Kruskal_Wallis(summer_data, 'pustynia', 'Rainf', random_state=13)
 
 test_for_residuals_normality(summer_data, 'Evap')
 
@@ -287,7 +284,7 @@ plot_density(summer_data, 'pustynia', 'Evap', random_state=13)
 
 OLS_report_and_ANOVA(summer_data, 'pustynia', 'Evap')
 
-perform_Kruskal_Wallis(summer_data, 'pustynia', 'Evap', 13)
+perform_Kruskal_Wallis(summer_data, 'pustynia', 'Evap', random_state=13)
 
 test_for_residuals_normality(summer_data, 'AvgSurfT')
 
@@ -295,7 +292,7 @@ plot_density(summer_data, 'pustynia', 'AvgSurfT', random_state=13)
 
 OLS_report_and_ANOVA(summer_data, 'pustynia', 'AvgSurfT')
 
-perform_Kruskal_Wallis(summer_data, 'pustynia', 'AvgSurfT', 13)
+perform_Kruskal_Wallis(summer_data, 'pustynia', 'AvgSurfT', random_state=13)
 
 test_for_residuals_normality(summer_data, 'Albedo')
 
@@ -303,7 +300,7 @@ plot_density(summer_data, 'pustynia', 'Albedo', random_state=13)
 
 OLS_report_and_ANOVA(summer_data, 'pustynia', 'Albedo')
 
-perform_Kruskal_Wallis(summer_data, 'pustynia', 'Albedo', 13)
+perform_Kruskal_Wallis(summer_data, 'pustynia', 'Albedo', random_state=13)
 
 test_for_residuals_normality(summer_data, 'SoilT_40_100cm')
 
@@ -311,7 +308,7 @@ plot_density(summer_data, 'pustynia', 'SoilT_40_100cm')
 
 OLS_report_and_ANOVA(summer_data, 'pustynia', 'SoilT_40_100cm')
 
-perform_Kruskal_Wallis(summer_data, 'pustynia', 'SoilT_40_100cm', 13)
+perform_Kruskal_Wallis(summer_data, 'pustynia', 'SoilT_40_100cm', random_state=13)
 
 test_for_residuals_normality(summer_data, 'GVEG')
 
@@ -319,7 +316,7 @@ plot_density(summer_data, 'pustynia', 'GVEG', random_state=13)
 
 OLS_report_and_ANOVA(summer_data, 'pustynia', 'GVEG')
 
-perform_Kruskal_Wallis(summer_data, 'pustynia', 'GVEG', 13)
+perform_Kruskal_Wallis(summer_data, 'pustynia', 'GVEG', random_state=13)
 
 test_for_residuals_normality(summer_data, 'PotEvap')
 
@@ -327,7 +324,7 @@ plot_density(summer_data, 'pustynia', 'PotEvap', random_state=13)
 
 OLS_report_and_ANOVA(summer_data, 'pustynia', 'PotEvap')
 
-perform_Kruskal_Wallis(summer_data, 'pustynia', 'PotEvap', 13)
+perform_Kruskal_Wallis(summer_data, 'pustynia', 'PotEvap', random_state=13)
 
 test_for_residuals_normality(summer_data, 'RootMoist')
 
@@ -335,7 +332,7 @@ plot_density(summer_data, 'pustynia', 'RootMoist', random_state=13)
 
 OLS_report_and_ANOVA(summer_data, 'pustynia', 'RootMoist')
 
-perform_Kruskal_Wallis(summer_data, 'pustynia','RootMoist', 13)
+perform_Kruskal_Wallis(summer_data, 'pustynia','RootMoist', random_state=13)
 
 test_for_residuals_normality(summer_data, 'SoilM_100_200cm')
 
@@ -343,7 +340,7 @@ plot_density(summer_data, 'pustynia', 'SoilM_100_200cm', random_state=13)
 
 OLS_report_and_ANOVA(summer_data, 'pustynia', 'SoilM_100_200cm')
 
-perform_Kruskal_Wallis(summer_data, 'pustynia', 'SoilM_100_200cm', 13)
+perform_Kruskal_Wallis(summer_data, 'pustynia', 'SoilM_100_200cm', random_state=13)
 
 test_for_residuals_normality(summer_data, 'P/PET')
 
@@ -351,7 +348,7 @@ plot_density(summer_data, 'pustynia', 'P/PET', random_state=13)
 
 OLS_report_and_ANOVA(summer_data, 'pustynia', 'P/PET')
 
-perform_Kruskal_Wallis(summer_data, 'pustynia', 'P/PET', 13)
+perform_Kruskal_Wallis(summer_data, 'pustynia', 'P/PET', random_state=13)
 
 winter_data = December_2021_DF.drop(columns=['Month', 'Year'])
 
@@ -361,7 +358,7 @@ plot_density(winter_data, 'pustynia', 'Rainf', random_state=13)
 
 OLS_report_and_ANOVA(winter_data, 'pustynia', 'Rainf')
 
-perform_Kruskal_Wallis(winter_data, 'pustynia', 'Rainf', 13)
+perform_Kruskal_Wallis(winter_data, 'pustynia', 'Rainf', random_state=13)
 
 test_for_residuals_normality(winter_data, 'Evap')
 
@@ -369,7 +366,7 @@ plot_density(winter_data, 'pustynia', 'Evap', random_state=13)
 
 OLS_report_and_ANOVA(winter_data, 'pustynia','Evap')
 
-perform_Kruskal_Wallis(winter_data, 'pustynia','Evap', 13)
+perform_Kruskal_Wallis(winter_data, 'pustynia','Evap', random_state=13)
 
 test_for_residuals_normality(winter_data, 'AvgSurfT')
 
@@ -377,7 +374,7 @@ plot_density(winter_data, 'pustynia', 'AvgSurfT', random_state=13)
 
 OLS_report_and_ANOVA(winter_data, 'pustynia', 'AvgSurfT')
 
-perform_Kruskal_Wallis(winter_data, 'pustynia', 'AvgSurfT', 13)
+perform_Kruskal_Wallis(winter_data, 'pustynia', 'AvgSurfT', random_state=13)
 
 test_for_residuals_normality(winter_data, 'Albedo')
 
@@ -385,7 +382,7 @@ plot_density(winter_data, 'pustynia', 'Albedo')
 
 OLS_report_and_ANOVA(winter_data, 'pustynia', 'Albedo')
 
-perform_Kruskal_Wallis(winter_data, 'pustynia', 'Albedo', 13)
+perform_Kruskal_Wallis(winter_data, 'pustynia', 'Albedo', random_state=13)
 
 test_for_residuals_normality(winter_data, 'SoilT_40_100cm')
 
@@ -393,7 +390,7 @@ plot_density(winter_data, 'pustynia', 'SoilT_40_100cm', random_state=13)
 
 OLS_report_and_ANOVA(winter_data, 'pustynia', 'SoilT_40_100cm')
 
-perform_Kruskal_Wallis(winter_data, 'pustynia', 'SoilT_40_100cm', 13)
+perform_Kruskal_Wallis(winter_data, 'pustynia', 'SoilT_40_100cm', random_state=13)
 
 test_for_residuals_normality(winter_data, 'GVEG')
 
@@ -401,7 +398,7 @@ plot_density(winter_data, 'pustynia', 'GVEG', random_state=13)
 
 OLS_report_and_ANOVA(winter_data, 'pustynia', 'GVEG')
 
-perform_Kruskal_Wallis(winter_data, 'pustynia', 'GVEG', 13)
+perform_Kruskal_Wallis(winter_data, 'pustynia', 'GVEG', random_state=13)
 
 test_for_residuals_normality(winter_data, 'PotEvap')
 
@@ -409,7 +406,7 @@ plot_density(winter_data, 'pustynia', 'PotEvap', random_state=13)
 
 OLS_report_and_ANOVA(winter_data, 'pustynia', 'PotEvap')
 
-perform_Kruskal_Wallis(winter_data, 'pustynia', 'PotEvap', 13)
+perform_Kruskal_Wallis(winter_data, 'pustynia', 'PotEvap', random_state=13)
 
 test_for_residuals_normality(winter_data, 'RootMoist')
 
@@ -417,7 +414,7 @@ plot_density(winter_data, 'pustynia', 'RootMoist', random_state=13)
 
 OLS_report_and_ANOVA(winter_data, 'pustynia', 'RootMoist')
 
-perform_Kruskal_Wallis(winter_data, 'pustynia', 'RootMoist', 13)
+perform_Kruskal_Wallis(winter_data, 'pustynia', 'RootMoist', random_state=13)
 
 test_for_residuals_normality(winter_data, 'SoilM_100_200cm')
 
@@ -425,10 +422,9 @@ plot_density(winter_data, 'pustynia', 'SoilM_100_200cm', random_state=13)
 
 OLS_report_and_ANOVA(winter_data, 'pustynia', 'SoilM_100_200cm')
 
-perform_Kruskal_Wallis(winter_data, 'pustynia', 'SoilM_100_200cm', 13)
+perform_Kruskal_Wallis(winter_data, 'pustynia', 'SoilM_100_200cm', random_state=13)
 
-full_summer_data = spark.sql('''SELECT * from nasa_full WHERE Month = 7 AND (Year = 2021 OR Year = 2019)''').toPandas()
-full_summer_data = full_summer_data.drop(columns=['Month', 'Year', 'lon', 'lat'])
+full_summer_data = spark.sql('''SELECT * from nasa_full WHERE Month = 7 AND (Year = 2021 OR Year = 2019)''').drop('Month', 'Year', 'lon', 'lat').toPandas()
 
 corr = full_summer_data.corr(method = "pearson")
 cmap = sns.diverging_palette(250, 323, 80, 60, center='dark', as_cmap=True)
@@ -436,8 +432,7 @@ sns.heatmap(corr, vmax =1, vmin=-0.3, cmap = cmap, square = True, linewidths = 0
 
 sns.pairplot(data=full_summer_data, diag_kind='kde')
 
-full_winter_data = spark.sql('''SELECT * from nasa_full WHERE Month = 12 AND (Year = 2021 OR Year = 2019)''').toPandas()
-full_winter_data = full_winter_data.drop(columns=['Month', 'Year', 'lon', 'lat'])
+full_winter_data = spark.sql('''SELECT * from nasa_full WHERE Month = 12 AND (Year = 2021 OR Year = 2019)''').drop('Month', 'Year', 'lon', 'lat').toPandas()
 
 corr = full_winter_data.corr(method = "pearson")
 cmap = sns.diverging_palette(250, 323, 80, 60, center='dark', as_cmap=True)
@@ -445,8 +440,9 @@ sns.heatmap(corr, vmax =1, vmin=-0.3, cmap = cmap, square = True, linewidths = 0
 
 sns.pairplot(data=full_winter_data, diag_kind='kde')
 
-def Kfolds_crossvalidation( model: BaseEstimator, folds: np.ndarray, folds_labels: List[List[int]]) -> dict:
-
+def Kfolds_crossvalidation(model: BaseEstimator, folds: np.ndarray, folds_labels: List[List[int]]) -> dict:
+ ''' The function performs Kfolds crossvalidation of a given model
+     with given folds '''
  validation_accuracy = []
  validation_recall = []
  validation_precision = []
@@ -455,25 +451,25 @@ def Kfolds_crossvalidation( model: BaseEstimator, folds: np.ndarray, folds_label
 
  k=len(folds)
  for i in range(k):
-       X_test = folds[i]
-       y_test = folds_labels[i]
-       train_folds = [fold for fold in folds if fold.tolist() != folds[i].tolist()]
-       train_labels = [labels for labels in folds_labels if labels != folds_labels[i]]
-       X_train = np.concatenate(train_folds)
-       y_train = np.concatenate(train_labels)
-       trained_model = model.fit(X_train, y_train)
-       y_pred = trained_model.predict(X_test)
-       validation_accuracy.append(accuracy_score(y_test, y_pred))
-       validation_recall.append(recall_score(y_test, y_pred))
-       validation_precision.append(precision_score(y_test, y_pred, zero_division=0))
-       validation_ROCAUC.append(roc_auc_score(y_test, y_pred))
-       validation_jaccard.append(jaccard_score(y_test, y_pred))
+     X_test = folds[i]
+     y_test = folds_labels[i]
+     train_folds = [fold for fold in folds if fold.tolist() != folds[i].tolist()]
+     train_labels = [labels for labels in folds_labels if labels != folds_labels[i]]
+     X_train = np.concatenate(train_folds)
+     y_train = np.concatenate(train_labels)
+     model.fit(X_train, y_train)
+     y_pred = model.predict(X_test)
+     validation_accuracy.append(accuracy_score(y_test, y_pred))
+     validation_recall.append(recall_score(y_test, y_pred))
+     validation_precision.append(precision_score(y_test, y_pred, zero_division=0))
+     validation_ROCAUC.append(roc_auc_score(y_test, y_pred))
+     validation_jaccard.append(jaccard_score(y_test, y_pred))
 
-       results = {'accuracy': mean(validation_accuracy),
-                 'recall': mean(validation_recall),
-                 'precision': mean(validation_precision),
-                  'ROC-AUC': mean(validation_ROCAUC),
-                  'jaccard_score': mean(validation_jaccard)}
+ results = {'accuracy': mean(validation_accuracy),
+            'recall': mean(validation_recall),
+            'precision': mean(validation_precision),
+            'ROC-AUC': mean(validation_ROCAUC),
+            'jaccard_score': mean(validation_jaccard)}
 
  return results
 
@@ -487,26 +483,29 @@ def data_standarization(df: pd.DataFrame) -> np.ndarray:
     return standarized
 
 def GridSearchCV_LogisticRegression(folds: np.ndarray, folds_labels: List[List[int]], param_grid: dict) -> pd.DataFrame:
-  all_res = dict({'penalty': [], 'solver': [], 'class_weight': [], 'C': [], 'accuracy': [], 'recall': [],
-                      'precision': [], 'ROC-AUC': [], 'jaccard_score': []})
+  all_res = {'penalty': [], 'solver': [], 'class_weight': [], 'C': [], 'accuracy': [], 'recall': [],
+              'precision': [], 'ROC-AUC': [], 'jaccard_score': []}
 
-  for penalty in param_grid['penalty']:
-    for weight in param_grid['class_weight']:
-      for solver in param_grid['solver']:
-         for c in param_grid['C']:
-            model = LogisticRegression(penalty=penalty, class_weight = weight, solver=solver, C=c, max_iter=10000)
-            results = {'penalty': penalty, 'solver': solver, 'class_weight': str(weight), 'C': c}
-            crossval_results = Kfolds_crossvalidation(model, folds, folds_labels)
-            results.update(crossval_results)
-            results_sorted = dict({key : results[key] for key in all_res.keys()})
-            all_res = {key: all_res[key] + [results_sorted[key]] for key in all_res}
+  param_values = [
+    param_grid['solver'],
+    param_grid['penalty'],
+    param_grid['C'],
+    param_grid['class_weight'],
+  ]
 
-  cross_results = pd.DataFrame(data=all_res)
-  return cross_results
+  for solver, penalty, c, class_weight in product(*param_values):
+      model = LogisticRegression(penalty=penalty, class_weight = class_weight, solver=solver, C=c, max_iter=10000)
+      results = {'penalty': penalty, 'solver': solver, 'class_weight': str(class_weight), 'C': c}
+      crossval_results = Kfolds_crossvalidation(model, folds, folds_labels)
+      results.update(crossval_results)
+      results_sorted = {key : results[key] for key in all_res.keys()}
+      all_res = {key: all_res[key] + [results_sorted[key]] for key in all_res}
+
+  return pd.DataFrame(data=all_res)
 
 #Splitting into folds
 blocks = block_partition(July_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_July_2019 = Kfolds(blocks, 6, random_state=3)
+folds_July_2019 = Kfolds(blocks, 6, random_state=333)
 folds_07_2019_labels = [list(fold['pustynia']) for fold in folds_July_2019]
 
 #Data standarization
@@ -517,23 +516,23 @@ folds_07_2019_stand = [data_standarization(fold) for fold in folds_July_2019]
 param_grid = {'penalty': ['l2'],
               'class_weight': [None, 'balanced', {1:2, 0:1}, {1:1.5, 0:1}],
               'solver': ['sag', 'saga', 'newton-cholesky', 'lbfgs'],
-              'C':[200, 100, 20, 10, 1.5, 1, 0.8, 0.5] }
+              'C':[200, 100, 20, 10, 1.5, 1, 0.8, 0.5, 0.1, 0.01] }
 
 param_grid2 = {'penalty': ['l1'],
               'class_weight': [None, 'balanced', {1:2, 0:1}, {1:1.5, 0:1}],
               'solver': ['liblinear', 'saga'],
-              'C':[200, 100, 20, 10, 1.5, 1, 0.8, 0.5] }
+              'C':[200, 100, 20, 10, 1.5, 1, 0.8, 0.5, 0.1, 0.01] }
 
 results = GridSearchCV_LogisticRegression(folds_07_2019_stand, folds_07_2019_labels, param_grid)
 
 results2 = GridSearchCV_LogisticRegression(folds_07_2019_stand, folds_07_2019_labels, param_grid2)
 
 all_results = pd.concat([results, results2], ignore_index=True)
-all_results.sort_values(by=['precision','jaccard_score'], ascending=False).head(25)
+all_results.sort_values(by=['accuracy','precision','jaccard_score'], ascending=False).head(25)
 
 #Splitting into folds
 blocks = block_partition(August_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_August_2019 = Kfolds(blocks, 6, random_state=3)
+folds_August_2019 = Kfolds(blocks, 6, random_state=333)
 folds_08_2019_labels = [list(fold['pustynia']) for fold in folds_August_2019]
 
 #Data standarization
@@ -546,13 +545,13 @@ results2 = GridSearchCV_LogisticRegression(folds_08_2019_stand, folds_08_2019_la
 
 allresults= pd.concat([results, results2], ignore_index=True)
 
-allresults.sort_values(by=['accuracy','jaccard_score'], ascending=False)
+allresults.sort_values(by=['accuracy', 'precision','jaccard_score'], ascending=False).head(20)
 
 allresults.sort_values(by='precision', ascending=False)
 
 #Splitting into folds
 blocks = block_partition(May_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_May_2019 = Kfolds(blocks, 6, random_state=3)
+folds_May_2019 = Kfolds(blocks, 6, random_state=333)
 folds_05_2019_labels = [list(fold['pustynia']) for fold in folds_May_2019]
 
 #Data standarization
@@ -566,13 +565,13 @@ results2 = GridSearchCV_LogisticRegression(folds_05_2019_stand, folds_05_2019_la
 
 all_results = pd.concat([results, results2], ignore_index=True)
 
-all_results.sort_values(by=['precision', 'jaccard_score'], ascending=False)
+all_results.sort_values(by=['accuracy', 'precision', 'jaccard_score'], ascending=False)
 
 July_2019_DF2 = copy.deepcopy(July_2019_DF)
 July_2019_DF2['Rainf/PotEvap'] = (July_2019_DF2['Rainf']/July_2019_DF2['PotEvap'])
 #Splitting into folds
 blocks = block_partition(July_2019_DF2, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_July_2019 = Kfolds(blocks, 6, random_state=3)
+folds_July_2019 = Kfolds(blocks, 6, random_state=333)
 folds_07_2019_labels = [list(fold['pustynia']) for fold in folds_July_2019]
 
 #Data standarization
@@ -585,13 +584,13 @@ results = GridSearchCV_LogisticRegression(folds_07_2019_stand2, folds_07_2019_la
 results2 = GridSearchCV_LogisticRegression(folds_07_2019_stand2, folds_07_2019_labels, param_grid2)
 
 all_results = pd.concat([results, results2], ignore_index=True)
-all_results.sort_values(by=['precision','recall'], ascending=False)
+all_results.sort_values(by=['accuracy','precision','recall'], ascending=False)
 
 May_2019_DF2 = copy.deepcopy(May_2019_DF)
 May_2019_DF2['Rainf/PotEvap'] = (May_2019_DF2['Rainf']/May_2019_DF2['PotEvap'])
 #Splitting into folds
 blocks = block_partition(May_2019_DF2, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_May_2019 = Kfolds(blocks, 6, random_state=3)
+folds_May_2019 = Kfolds(blocks, 6, random_state=333)
 folds_05_2019_labels = [list(fold['pustynia']) for fold in folds_May_2019]
 
 #Data standarization
@@ -604,13 +603,13 @@ results = GridSearchCV_LogisticRegression(folds_05_2019_stand2, folds_05_2019_la
 results2 = GridSearchCV_LogisticRegression(folds_05_2019_stand2, folds_05_2019_labels, param_grid2)
 
 all_results = pd.concat([results, results2], ignore_index=True)
-all_results.sort_values(by=['precision','recall'], ascending=False)
+all_results.sort_values(by=['accuracy','precision','recall'], ascending=False)
 
 August_2019_DF2 = copy.deepcopy(August_2019_DF)
 August_2019_DF2['Rainf/PotEvap'] = (August_2019_DF2['Rainf']/August_2019_DF2['PotEvap'])
 #Splitting into folds
 blocks = block_partition(August_2019_DF2, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_August_2019 = Kfolds(blocks, 6, random_state=3)
+folds_August_2019 = Kfolds(blocks, 6, random_state=333)
 folds_08_2019_labels = [list(fold['pustynia']) for fold in folds_August_2019]
 
 #Data standarization
@@ -623,11 +622,11 @@ results = GridSearchCV_LogisticRegression(folds_08_2019_stand2, folds_08_2019_la
 results2 = GridSearchCV_LogisticRegression(folds_08_2019_stand2, folds_08_2019_labels, param_grid2)
 
 all_results = pd.concat([results, results2], ignore_index=True)
-all_results.sort_values(by=['precision','recall'], ascending=False)
+all_results.sort_values(by=['accuracy','precision','recall'], ascending=False)
 
 #Splitting into folds
 blocks = block_partition(July_2019_DF2, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_July_2019 = Kfolds(blocks, 6, random_state=3)
+folds_July_2019 = Kfolds(blocks, 6, random_state=333)
 folds_07_2019_labels = [list(fold['pustynia']) for fold in folds_July_2019]
 
 #Data standarization
@@ -641,11 +640,11 @@ results = GridSearchCV_LogisticRegression(folds_07_2019_stand3, folds_07_2019_la
 results2 = GridSearchCV_LogisticRegression(folds_07_2019_stand3, folds_07_2019_labels, param_grid2)
 
 all_results = pd.concat([results, results2], ignore_index=True)
-all_results.sort_values(by=['precision','recall'], ascending=False)
+all_results.sort_values(by=['accuracy','precision','recall'], ascending=False).head(20)
 
 #Splitting into folds
 blocks = block_partition(May_2019_DF2, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_May_2019 = Kfolds(blocks, 6, random_state=3)
+folds_May_2019 = Kfolds(blocks, 6, random_state=333)
 folds_05_2019_labels = [list(fold['pustynia']) for fold in folds_May_2019]
 
 #Data standarization
@@ -658,11 +657,11 @@ results = GridSearchCV_LogisticRegression(folds_05_2019_stand3, folds_05_2019_la
 results2 = GridSearchCV_LogisticRegression(folds_05_2019_stand3, folds_05_2019_labels, param_grid2)
 
 all_results = pd.concat([results, results2], ignore_index=True)
-all_results.sort_values(by=['precision','recall'], ascending=False)
+all_results.sort_values(by=['accuracy','precision','recall'], ascending=False)
 
 #Splitting into folds
 blocks = block_partition(August_2019_DF2, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_August_2019 = Kfolds(blocks, 6, random_state=3)
+folds_August_2019 = Kfolds(blocks, 6, random_state=333)
 folds_08_2019_labels = [list(fold['pustynia']) for fold in folds_August_2019]
 
 #Data standarization
@@ -672,14 +671,14 @@ folds_08_2019_stand3 = [data_standarization(fold) for fold in folds_August_2019]
 
 results = GridSearchCV_LogisticRegression(folds_08_2019_stand3, folds_08_2019_labels, param_grid)
 
-results = GridSearchCV_LogisticRegression(folds_08_2019_stand3, folds_08_2019_labels, param_grid2)
+results2 = GridSearchCV_LogisticRegression(folds_08_2019_stand3, folds_08_2019_labels, param_grid2)
 
 all_results = pd.concat([results, results2], ignore_index=True)
-all_results.sort_values(by=['precision','recall'], ascending=False)
+all_results.sort_values(by=['accuracy','precision','recall'], ascending=False)
 
 #Splitting into folds
 blocks = block_partition(December_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_December_2019 = Kfolds(blocks, 6, random_state=3)
+folds_December_2019 = Kfolds(blocks, 6, random_state=333)
 folds_12_2019_labels = [list(fold['pustynia']) for fold in folds_December_2019]
 
 #Data standarization
@@ -692,11 +691,11 @@ results = GridSearchCV_LogisticRegression(folds_12_2019_stand, folds_12_2019_lab
 results2 = GridSearchCV_LogisticRegression(folds_12_2019_stand, folds_12_2019_labels, param_grid2)
 
 all_results = pd.concat([results, results2], ignore_index=True)
-all_results.sort_values(by=['precision','recall'], ascending=False)
+all_results.sort_values(by=['accuracy','precision','recall'], ascending=False)
 
 #Splitting into folds
 blocks = block_partition(January_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_January_2019 = Kfolds(blocks, 6, random_state=3)
+folds_January_2019 = Kfolds(blocks, 6, random_state=333)
 folds_01_2019_labels = [list(fold['pustynia']) for fold in folds_January_2019]
 
 #Data standarization
@@ -713,7 +712,7 @@ all_results.sort_values(by=['precision','recall'], ascending=False)
 
 #Splitting into folds
 blocks = block_partition(December_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_December_2019 = Kfolds(blocks, 6, random_state=3)
+folds_December_2019 = Kfolds(blocks, 6, random_state=333)
 folds_12_2019_labels = [list(fold['pustynia']) for fold in folds_December_2019]
 
 #Data standarization
@@ -727,13 +726,11 @@ results2 = GridSearchCV_LogisticRegression(folds_12_2019_stand2, folds_12_2019_l
 all_results = pd.concat([results, results2], ignore_index=True)
 all_results.sort_values(by=['precision','recall'], ascending=False)
 
-#Splitting into folds
+#Splitting into blocks:
 blocks = block_partition(December_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_December_2019 = Kfolds(blocks, 6, random_state=3)
-folds_12_2019_labels = [list(fold['pustynia']) for fold in folds_December_2019]
-
-#Data standarization
-folds_December_2019 = [fold.drop(columns=['lon', 'lat', 'Year', 'Month','pustynia','SoilT_40_100cm','Rainf', 'PotEvap'])
+folds_December_2019 = Kfolds(blocks, 6, random_state=333)
+#Data standarization"
+folds_December_2019 = [fold.drop(columns=['lon', 'lat', 'Year', 'Month','pustynia','SoilT_40_100cm','PotEvap', 'Rainf'])
                    for fold in folds_December_2019]
 folds_12_2019_stand3= [data_standarization(fold) for fold in folds_December_2019]
 
@@ -741,11 +738,11 @@ results = GridSearchCV_LogisticRegression(folds_12_2019_stand3, folds_12_2019_la
 results2 = GridSearchCV_LogisticRegression(folds_12_2019_stand3, folds_12_2019_labels, param_grid2)
 
 all_results = pd.concat([results, results2], ignore_index=True)
-all_results.sort_values(by=['precision', 'recall'], ascending=False).head(20)
+all_results.sort_values(by=['accuracy','precision', 'recall'], ascending=False).head(20)
 
 #Splitting into folds
 blocks = block_partition(December_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_December_2019 = Kfolds(blocks, 6, random_state=3)
+folds_December_2019 = Kfolds(blocks, 6, random_state=333)
 folds_12_2019_labels = [list(fold['pustynia']) for fold in folds_December_2019]
 
 #Data standarization
@@ -757,15 +754,15 @@ results = GridSearchCV_LogisticRegression(folds_12_2019_stand4, folds_12_2019_la
 results2 = GridSearchCV_LogisticRegression(folds_12_2019_stand4, folds_12_2019_labels, param_grid2)
 
 all_results = pd.concat([results, results2], ignore_index=True)
-all_results.sort_values(by=['precision','recall'], ascending=False)
+all_results.sort_values(by=['accuracy','precision','recall'], ascending=False)
 
 #Splitting into folds
 blocks = block_partition(December_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_December_2019 = Kfolds(blocks, 6, random_state=3)
+folds_December_2019 = Kfolds(blocks, 6, random_state=333)
 folds_12_2019_labels = [list(fold['pustynia']) for fold in folds_December_2019]
 
 #Data standarization
-folds_December_2019 = [fold.drop(columns=['lon', 'lat', 'Year', 'Month','pustynia','SoilT_40_100cm', 'Rainf', 'Albedo'])
+folds_December_2019 = [fold.drop(columns=['lon', 'lat', 'Year', 'Month','pustynia','SoilT_40_100cm', 'Rainf', 'Albedo', 'Evap'])
                    for fold in folds_December_2019]
 folds_12_2019_stand5 = [data_standarization(fold) for fold in folds_December_2019]
 
@@ -773,7 +770,7 @@ results = GridSearchCV_LogisticRegression(folds_12_2019_stand5, folds_12_2019_la
 results2 = GridSearchCV_LogisticRegression(folds_12_2019_stand5, folds_12_2019_labels, param_grid2)
 
 all_results = pd.concat([results, results2], ignore_index=True)
-all_results.sort_values(by=['precision','recall'], ascending=False)
+all_results.sort_values(by=['accuracy','precision','recall'], ascending=False)
 
 def get_colormap(values: list, colors_palette: list, name = 'custom'):
     values = np.sort(np.array(values))
@@ -820,19 +817,17 @@ def train_and_predict(model: BaseEstimator, df_train: pd.DataFrame, df_fit: pd.D
 
   return y_pred
 
-model = LogisticRegression(solver='lbfgs', class_weight=None, penalty='l2', C=10, max_iter=10000)
+model = LogisticRegression(solver='sag', class_weight={1:2, 0:1}, penalty='l2', C=10, max_iter=10000)
 df_train = July_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
 nasa_07_2019 = pd.DataFrame(nasa2019full[nasa2019full['Month']==7])
 nasa_fit = nasa_07_2019.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
 labels = pd.DataFrame({'lon': nasa_07_2019['lon'], 'lat': nasa_07_2019['lat'], 'label': y_pred})
 
-colormap = get_colormap([0, 1], ['green', 'yellow'])
+colormap = get_colormap([0, 1], ['darkgreen', 'yellow'])
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 
-model = LogisticRegression(solver='lbfgs', class_weight=None, penalty='l2', C=10, max_iter=10000)
-df_train = July_2019_DF.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
 nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==7])
 nasa_fit = nasa_07_2021.drop(columns=['lon', 'lat','Year', 'Month', 'SoilT_40_100cm'])
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
@@ -847,7 +842,7 @@ labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], '
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap, colorbar=True), alpha=0.5)
 
-model = LogisticRegression(solver='saga', class_weight={1:2, 0:1}, penalty='l1', C=0.8, max_iter=10000)
+model = LogisticRegression(solver='saga', class_weight={1:2, 0:1}, penalty='l1', C=0.5, max_iter=10000)
 df_train = July_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
 nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==7])
 nasa_fit = nasa_07_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
@@ -863,7 +858,7 @@ labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], '
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap, colorbar=True), alpha=0.5)
 
-model = LogisticRegression(solver='saga', class_weight={1:2, 0:1}, penalty='l1', C=1.5, max_iter=10000)
+model = LogisticRegression(solver='saga', class_weight={1:2, 0:1}, penalty='l2', C=0.1, max_iter=10000)
 df_train = August_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
 nasa_08_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==8])
 nasa_fit = nasa_08_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
@@ -879,7 +874,7 @@ labels = pd.DataFrame({'lon': nasa_08_2021['lon'], 'lat': nasa_08_2021['lat'], '
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap, colorbar=True), alpha=0.5)
 
-model = LogisticRegression(solver='sag', class_weight=None, penalty='l2', C=200, max_iter=10000)
+model = LogisticRegression(solver='sag', class_weight={1:1.5, 0:1}, penalty='l2', C=0.1, max_iter=10000)
 df_train = August_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
 nasa_08_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==8])
 nasa_fit = nasa_08_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
@@ -895,7 +890,7 @@ labels = pd.DataFrame({'lon': nasa_08_2021['lon'], 'lat': nasa_08_2021['lat'], '
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap, colorbar=True), alpha=0.5)
 
-model = LogisticRegression(solver='liblinear', class_weight={1:1.5, 0:1}, penalty='l1', C=0.8, max_iter=10000)
+model = LogisticRegression(solver='liblinear', class_weight={1:1.5, 0:1}, penalty='l1', C=0.5, max_iter=10000)
 df_train = August_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
 nasa_08_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==8])
 nasa_fit = nasa_08_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
@@ -911,7 +906,7 @@ labels = pd.DataFrame({'lon': nasa_08_2021['lon'], 'lat': nasa_08_2021['lat'], '
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap, colorbar=True), alpha=0.5)
 
-model = LogisticRegression(solver='newton-cholesky', class_weight=None, penalty='l2', C=0.5, max_iter=10000)
+model = LogisticRegression(solver='newton-cholesky', class_weight={1:1.5, 0:1}, penalty='l2', C=10, max_iter=10000)
 df_train = July_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
 df_train['Rainf/Potevap'] =  df_train['Rainf']/df_train['PotEvap']
 df_train = df_train.drop(columns=['PotEvap'])
@@ -931,7 +926,7 @@ labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], '
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap, colorbar=True), alpha=0.5)
 
-model3 = LogisticRegression(solver='sag', class_weight=None, penalty='l2', C=1, max_iter=10000)
+model3 = LogisticRegression(solver='saga', class_weight={1:1.5, 0:1}, penalty='l2', C=1, max_iter=10000)
 df_train = July_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm', 'AvgSurfT', 'RootMoist', 'SoilM_100_200cm','Albedo'])
 df_train['P/PET'] = df_train['Rainf']/df_train['PotEvap']
 nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==7])
@@ -949,7 +944,7 @@ labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], '
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap, colorbar=True), alpha=0.5)
 
-model = LogisticRegression(solver='sag', class_weight=None, penalty='l2', C=1, max_iter=10000)
+model = LogisticRegression(solver='liblinear', class_weight=None, penalty='l1', C=0.5, max_iter=10000)
 df_train = December_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
 nasa_12_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==12])
 nasa_fit = nasa_12_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
@@ -965,7 +960,7 @@ labels = pd.DataFrame({'lon': nasa_12_2021['lon'], 'lat': nasa_12_2021['lat'], '
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap, colorbar=True), alpha=0.5)
 
-model = LogisticRegression(solver='sag', class_weight=None, penalty='l2', C=1, max_iter=10000)
+model = LogisticRegression(solver='liblinear', class_weight={1:2, 0:1}, penalty='l1', C=0.1, max_iter=10000)
 df_train = January_2019_DF.drop(columns=['lon', 'lat', 'Year', 'Month','SoilT_40_100cm'])
 nasa_01_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==1])
 nasa_fit = nasa_01_2021.drop(columns=['lon', 'lat', 'Year', 'Month','SoilT_40_100cm'])
@@ -975,7 +970,7 @@ labels = pd.DataFrame({'lon': nasa_01_2021['lon'], 'lat': nasa_01_2021['lat'], '
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 
-model = LogisticRegression(solver='saga', class_weight=None, penalty='l2', C=1, max_iter=10000)
+model = LogisticRegression(solver='liblinear', class_weight={1:2, 0:1}, penalty='l1', C=0.1, max_iter=10000)
 df_train = December_2019_DF.drop(columns=['lon', 'lat', 'Year', 'Month','SoilT_40_100cm','Rainf', 'PotEvap'])
 nasa_12_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==12])
 nasa_fit = nasa_12_2021.drop(columns=['lon', 'lat', 'Year', 'Month','SoilT_40_100cm','Rainf', 'PotEvap'])
@@ -991,30 +986,49 @@ labels = pd.DataFrame({'lon': nasa_12_2021['lon'], 'lat': nasa_12_2021['lat'], '
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap, colorbar=True), alpha=0.5)
 
-def GridSearchCV_LinearSVM(folds: np.ndarray, folds_labels: List[List[int]], param_grid: dict) -> pd.DataFrame:
-  all_res = dict({'kernel': [], 'penalty': [], 'C': [], 'class_weight': [], 'loss': [], 'intercept_scal':[],
-                      'accuracy': [], 'recall': [], 'precision': [], 'ROC-AUC': [], 'jaccard_score': []})
+def GridSearchCV_SVM(folds: np.ndarray, folds_labels: List[List[int]], param_grid: dict, kernel: str) -> pd.DataFrame:
 
-  for loss in param_grid['loss']:
-    for penalty in param_grid['penalty']:
-      for c in param_grid['C']:
-        for  weight in param_grid['class_weight']:
-          for scal in param_grid['intercept_scal']:
-             if (loss =='hinge')&(penalty=='l2'):
-                 model = LinearSVC(C=c, penalty=penalty, class_weight= weight, loss=loss, dual= True,
-                               intercept_scaling = scal, max_iter = 100000, random_state=13)
-            else:
-                 model = LinearSVC(C=c, penalty=penalty, class_weight= weight, loss=loss, dual= False,
-                               intercept_scaling = scal, max_iter = 50000, random_state=13)
-             results = {'kernel': 'linear', 'penalty': penalty, 'C': c, 'class_weight': weight, 'loss': loss, 'intercept_scal': scal}
-             crossval_results = Kfolds_crossvalidation(model, folds, folds_labels)
-             results.update(crossval_results)
-             results_sorted = dict({key : results[key] for key in all_res.keys()})
-             all_res = {key: all_res[key] + [results_sorted[key]] for key in all_res}
+ if kernel == 'linear':
+     all_res = {'kernel': [], 'penalty': [], 'C': [], 'class_weight': [], 'loss': [], 'intercept_scal':[],
+                'accuracy': [], 'recall': [], 'precision': [], 'ROC-AUC': [], 'jaccard_score': []}
+     param_values = [
+                      param_grid['loss'],
+                      param_grid['penalty'],
+                      param_grid['C'],
+                      param_grid['class_weight'],
+                      param_grid['intercept_scal']
+                    ]
 
-  cross_results = pd.DataFrame(data=all_res)
+     for loss, penalty, C, class_weight, intercept_scal in product(*param_values):
+         if (loss =='hinge')&(penalty=='l2'):
+                 model = LinearSVC(C=C, penalty=penalty, class_weight= class_weight, loss=loss, dual= True,
+                               intercept_scaling = intercept_scal, max_iter = 100000, random_state=13)
+         else:
+                 model = LinearSVC(C=C, penalty=penalty, class_weight= class_weight, loss=loss, dual= False,
+                               intercept_scaling = intercept_scal, max_iter = 50000, random_state=13)
+         results = {'kernel': 'linear', 'penalty': penalty, 'C': C, 'class_weight': class_weight,
+                    'loss': loss, 'intercept_scal': intercept_scal}
+         crossval_results = Kfolds_crossvalidation(model, folds, folds_labels)
+         results.update(crossval_results)
+         results_sorted = dict({key : results[key] for key in all_res.keys()})
+         all_res = {key: all_res[key] + [results_sorted[key]] for key in all_res}
 
-  return cross_results
+ else:
+      all_res = {key : [] for key in param_grid.keys()}
+      metrics = {'accuracy': [], 'recall': [], 'precision': [], 'ROC-AUC': [], 'jaccard_score': []}
+      all_res.update(metrics)
+      hyperparameters = [dict(zip(param_grid.keys(), values)) for values in product(*param_grid.values())]
+      for hyperparams in hyperparameters:
+         model = SVC(**hyperparams)
+         results = hyperparams
+         results['kernel'] = kernel
+         crossval_results = Kfolds_crossvalidation(model, folds, folds_labels)
+         results.update(crossval_results)
+         results_sorted = dict({key : results[key] for key in all_res.keys()})
+         all_res = {key: all_res[key] + [results_sorted[key]] for key in all_res}
+
+ return pd.DataFrame(data=all_res)
+
 
 param_grid_linear = { 'penalty': ['l1', 'l2'],
                'C': [0.01, 0.1, 0.5, 0.8, 1, 5, 10, 50, 100],
@@ -1025,7 +1039,7 @@ param_grid_linear = { 'penalty': ['l1', 'l2'],
 
 #Splitting into folds
 blocks = block_partition(July_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_July_2019 = Kfolds(blocks, 6, random_state=3)
+folds_July_2019 = Kfolds(blocks, 6, random_state=333)
 folds_07_2019_labels = [list(fold['pustynia']) for fold in folds_July_2019]
 
 #Data standarization
@@ -1033,12 +1047,12 @@ folds_July_2019 = [fold.drop(columns=['lon', 'lat', 'Year', 'Month','pustynia','
                    for fold in folds_July_2019]
 folds_07_2019_stand = [data_standarization(fold) for fold in folds_July_2019]
 
-linear_results1 = GridSearchCV_LinearSVM(folds_07_2019_stand, folds_07_2019_labels, param_grid_linear)
-linear_results.sort_values(by=['accuracy', 'precision'], ascending=False)
+linear_results1 = GridSearchCV_SVM(folds_07_2019_stand, folds_07_2019_labels, param_grid_linear, kernel='linear')
+linear_results1.sort_values(by=['accuracy', 'precision'], ascending=False)
 
 #Splitting into folds
 blocks = block_partition(August_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_August_2019 = Kfolds(blocks, 6, random_state=3)
+folds_August_2019 = Kfolds(blocks, 6, random_state=333)
 folds_08_2019_labels = [list(fold['pustynia']) for fold in folds_August_2019]
 
 #Data standarization
@@ -1046,12 +1060,12 @@ folds_August_2019 = [fold.drop(columns=['lon', 'lat', 'Year', 'Month','pustynia'
                    for fold in folds_August_2019]
 folds_08_2019_stand = [data_standarization(fold) for fold in folds_August_2019]
 
-linear_results2 = GridSearchCV_LinearSVM(folds_08_2019_stand, folds_08_2019_labels, param_grid_linear)
+linear_results2 = GridSearchCV_SVM(folds_08_2019_stand, folds_08_2019_labels, param_grid_linear, kernel='linear')
 linear_results2.sort_values(by=['accuracy', 'precision'], ascending=False)
 
 #Splitting into folds
 blocks = block_partition(December_2019_DF, 2.5, min_lat, max_lat, min_lon, max_lon)
-folds_December_2019 = Kfolds(blocks, 6, random_state=3)
+folds_December_2019 = Kfolds(blocks, 6, random_state=333)
 folds_12_2019_labels = [list(fold['pustynia']) for fold in folds_December_2019]
 
 #Data standarization
@@ -1059,43 +1073,8 @@ folds_December_2019 = [fold.drop(columns=['lon', 'lat', 'Year', 'Month','pustyni
                    for fold in folds_December_2019]
 folds_12_2019_stand = [data_standarization(fold) for fold in folds_December_2019]
 
-linear_results2 = GridSearchCV_LinearSVM(folds_12_2019_stand, folds_12_2019_labels, param_grid_linear)
-linear_results2.sort_values(by=['accuracy', 'precision'], ascending=False)
-
-def GridSearchCV_SVM(folds: np.ndarray, folds_labels: List[List[int]], param_grid: dict, kernel: str) -> pd.DataFrame:
-
-  if kernel=='poly':
-    all_res = dict({'kernel': [],  'C': [], 'class_weight': [], 'gamma':[], 'degree': [], "coef0" :[],
-                  'accuracy': [], 'recall': [], 'precision': [], 'ROC-AUC': [], 'jaccard_score': []})
-    for gamma in param_grid['gamma']:
-      for degree in param_grid['degree']:
-        for  weight in param_grid['class_weight']:
-          for c  in param_grid['C']:
-            for coef in param_grid['coef0']:
-                model = SVC(kernel = 'poly', C=c, class_weight=weight, coef0=coef, gamma=gamma, max_iter=2000, random_state=13, verbose=True)
-                results = {'kernel': 'poly', 'C': c, 'class_weight': str(weight), 'gamma': gamma, 'degree': degree,'coef0': coef}
-                crossval_results = Kfolds_crossvalidation(model, folds, folds_labels)
-                results.update(crossval_results)
-                results_sorted = dict({key : results[key] for key in all_res.keys()})
-                all_res = {key: all_res[key] + [results_sorted[key]] for key in all_res}
-  else:
-      all_res = dict({'kernel': [],  'C': [], 'class_weight': [], 'gamma':[], "coef0" :[],
-                  'accuracy': [], 'recall': [], 'precision': [], 'ROC-AUC': [], 'jaccard_score': []})
-      for gamma in param_grid['gamma']:
-        for  weight in param_grid['class_weight']:
-          for c  in param_grid['C']:
-            for coef in param_grid['coef0']:
-                model = SVC(kernel = kernel, C=c, class_weight=weight, coef0=coef, gamma=gamma, max_iter=-1, random_state=13, verbose=True)
-                results = {'kernel': kernel, 'C': c, 'class_weight': str(weight), 'gamma': gamma,'coef0': coef}
-                crossval_results = Kfolds_crossvalidation(model, folds, folds_labels)
-                results.update(crossval_results)
-                results_sorted = dict({key : results[key] for key in all_res.keys()})
-                all_res = {key: all_res[key] + [results_sorted[key]] for key in all_res}
-
-
-  cross_results = pd.DataFrame(data=all_res)
-
-  return cross_results
+linear_results3 = GridSearchCV_SVM(folds_12_2019_stand, folds_12_2019_labels, param_grid_linear, kernel='linear')
+linear_results3.sort_values(by=['accuracy', 'precision'], ascending=False)
 
 param_grid_poly = {'C': [0.01, 0.1, 0.5, 0.8, 1, 10, 50],
               'class_weight': [None, 'balanced', {1:1.5, 0:1}],
@@ -1108,21 +1087,18 @@ poly_results.sort_values(by=['accuracy', 'precision'], ascending=False)
 
 param_grid_rbf = {'C': [0.001, 0.01, 0.1, 0.5, 0.8, 1, 1.5, 5, 10, 20, 50],
               'class_weight': [None, 'balanced', {1:1.5, 0:1}, {1:2, 0:1}],
-              'gamma': ['scale', 'auto', 0.001, 0.01, 0.1, 1, 10, 100],  'coef0': [0]}
+              'gamma': ['scale', 'auto', 0.001, 0.01, 0.1, 1, 10, 100] }
 
 rbf_results = GridSearchCV_SVM(folds_07_2019_stand, folds_07_2019_labels, param_grid_rbf, kernel='rbf')
 
-rbf_results = rbf_results.drop(columns=['coef0'])  #coef0 is only significant in ‘poly’ and ‘sigmoid’
 rbf_results.sort_values(by=['accuracy', 'precision', 'recall'], ascending=False).head(20)
 
 rbf_results2 = GridSearchCV_SVM(folds_08_2019_stand, folds_08_2019_labels, param_grid_rbf, kernel='rbf')
 
-rbf_results2 = rbf_results2.drop(columns=['coef0'])  #coef0 is only significant in ‘poly’ and ‘sigmoid’
 rbf_results2.sort_values(by=['accuracy', 'precision', 'recall'], ascending=False).head(20)
 
 rbf_results3 = GridSearchCV_SVM(folds_12_2019_stand, folds_12_2019_labels, param_grid_rbf, kernel='rbf')
 
-rbf_results3 = rbf_results3.drop(columns=['coef0'])  #coef0 is only significant in ‘poly’ and ‘sigmoid’
 rbf_results3.sort_values(by=['accuracy', 'precision', 'recall'], ascending=False).head(20)
 
 param_grid_sigm = {'C': [0.001, 0.01, 0.1, 0.5, 0.8, 1, 1.5, 5, 10, 20, 50],
@@ -1138,7 +1114,7 @@ sigmoid_results2 = GridSearchCV_SVM(folds_08_2019_stand, folds_08_2019_labels, p
 
 sigmoid_results.sort_values(by=['accuracy', 'precision', 'jaccard_score'], ascending=False)
 
-model = LinearSVC(penalty='l1', C=0.5, loss='squared_hinge', class_weight=None, intercept_scaling=1.0, dual=False)
+model = LinearSVC(penalty='l2', C=1, loss='squared_hinge', class_weight=None, intercept_scaling=1, dual=False)
 df_train = July_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
 nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==7])
 nasa_fit = nasa_07_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
@@ -1149,10 +1125,7 @@ colormap = get_colormap([0, 1], ['green', 'yellow'])
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 
-model = SVC(kernel='poly', degree=2, C=0.1, class_weight={1:1.5, 0:1}, gamma='scale', coef0=0.5)
-df_train = July_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
-nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==7])
-nasa_fit = nasa_07_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
+model = SVC(kernel='poly', degree=2, C=10, class_weight={1:2, 0:1}, gamma=0.01, coef0=0)
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
 labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], 'label': y_pred})
 
@@ -1160,19 +1133,20 @@ output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 
 model = SVC(C=0.1, class_weight={1:2, 0:1}, gamma='scale')
-df_train = July_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
-nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==7])
-nasa_fit = nasa_07_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
 labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], 'label': y_pred})
 
 output_notebook()
 show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
 
-model = SVC(kernel='sigmoid',C=50, class_weight=None, gamma=0.01, coef0=0.1)
-df_train = July_2019_DF.drop(columns=['lon','lat', 'Year', 'Month', 'SoilT_40_100cm'])
-nasa_07_2021 = pd.DataFrame(nasa2021full[nasa2021full['Month']==7])
-nasa_fit = nasa_07_2021.drop(columns=['lon', 'lat', 'Year', 'Month', 'SoilT_40_100cm'])
+model = SVC(C=10, class_weight={1:1.5, 0:1}, gamma=0.01)
+y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
+labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], 'label': y_pred})
+
+output_notebook()
+show(plot_map(df=labels, parameter_name='label', colormap=colormap), alpha=0.5)
+
+model = SVC(kernel='sigmoid',C=10, class_weight={1:1.5, 0:1}, gamma=0.01, coef0=0.5)
 y_pred = train_and_predict(model, df_train, nasa_fit, 'pustynia')
 labels = pd.DataFrame({'lon': nasa_07_2021['lon'], 'lat': nasa_07_2021['lat'], 'label': y_pred})
 
