@@ -8,41 +8,7 @@ Original file is located at
 
 # Klasyfikacja z wykorzystaniem modeli opartymi o drzewa decyzyjnyjne
 
-## Wczytywanie danych w sparku
-
-Utworzenie środowiska pyspark do obliczeń:
-"""
-
-from google.colab import drive
-drive.mount('/content/drive')
-
-# Commented out IPython magic to ensure Python compatibility.
-!git clone https://github.com/PiotrMaciejKowalski/BigData2024Project.git
-# %cd BigData2024Project
-!git checkout main
-# %cd ..
-
-!chmod 755 /content/BigData2024Project/src/setup.sh
-!/content/BigData2024Project/src/setup.sh
-
-import sys
-sys.path.append('/content/BigData2024Project/src')
-
-from start_spark import initialize_spark
-initialize_spark()
-
-import pandas as pd
-from pyspark.sql import SparkSession
-
-from big_mess.loaders import default_loader, load_single_month, load_anotated, save_to_csv, preprocessed_loader
-
-spark = SparkSession.builder\
-        .master("local")\
-        .appName("Colab")\
-        .config('spark.ui.port', '4050')\
-        .getOrCreate()
-
-"""## Budowa modeli drzew decyzyjnych
+## Budowa modeli drzew decyzyjnych
 
 **Cel**:
 
@@ -65,14 +31,23 @@ Dane wykorzystane do modelowania zostały stworzone po przez połączenie dwoch 
 
 Do modelowania uzyto metody drzew decyzyjnych.
 
-### Import bibliotek
+### Import bibliotek oraz utorzenie srodowiska pyspark
 """
 
 !pip install datashader
 !pip install holoviews hvplot colorcet
 !pip install geoviews
 
-from typing import List, Optional, Tuple, Any
+# Commented out IPython magic to ensure Python compatibility.
+!git clone https://github.com/PiotrMaciejKowalski/BigData2024Project.git
+# %cd BigData2024Project
+!git checkout main
+# %cd ..
+
+!chmod 755 /content/BigData2024Project/src/setup.sh
+!/content/BigData2024Project/src/setup.sh
+
+from typing import List, Optional, Tuple
 import pickle
 import pandas as pd
 import numpy as np
@@ -81,9 +56,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn import tree
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import confusion_matrix, classification_report, recall_score, precision_score, f1_score
+from sklearn.base import BaseEstimator
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score, recall_score, precision_score, f1_score
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.feature_selection import mutual_info_classif
 from imblearn.over_sampling import RandomOverSampler, SMOTE
 from lightgbm import LGBMClassifier
 import datashader as ds
@@ -97,24 +72,36 @@ from holoviews import opts
 from IPython.display import IFrame
 from bokeh.plotting import show, output_notebook
 
+from google.colab import drive
+import sys
+
+drive.mount('/content/drive')
+
+sys.path.append('/content/BigData2024Project/src')
+
+from start_spark import initialize_spark
+initialize_spark()
+
+from pyspark.sql import SparkSession
+from big_mess.loaders import default_loader, load_single_month, load_anotated, save_to_csv, preprocessed_loader
+
+spark = SparkSession.builder\
+        .master("local")\
+        .appName("Colab")\
+        .config('spark.ui.port', '4050')\
+        .getOrCreate()
+
 """### Przygotowanie danych
 
 Na podstawie wczesniej przygotowanych plikow .csv z anotowanymi danymi dla kazdego miesiaca tworzymy liste data framow.
 """
 
-list_of_files = ['nasa_anotated_202301.csv',
-                 'nasa_anotated_202302.csv',
-                 'nasa_anotated_202303.csv',
-                 'nasa_anotated_202304.csv',
-                 'nasa_anotated_202305.csv',
-                 'nasa_anotated_202306.csv',
-                 'nasa_anotated_202307.csv',
-                 'nasa_anotated_202308.csv',
-                 'nasa_anotated_202309.csv',
-                 'nasa_anotated_202210.csv',
-                 'nasa_anotated_202211.csv',
-                 'nasa_anotated_202212.csv'
-                 ]
+list_of_files = [
+   f'nasa_anotated_{year}{month:02d}.csv'
+   for year, month
+   in [ (2023, m) for m in range(1,10) ]
+   +  [ (2022, m) for m in range(10,13) ]
+]
 
 list_of_anotated_data = [preprocessed_loader(spark, '/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Anotated_data_12m/' + file) for file in list_of_files]
 
@@ -143,9 +130,7 @@ list_of_df_all[0].head()
 
 """Lista z danymi z kazdego miesiaca, do wizualizacji na mapach."""
 
-daty = [(2023,1), (2023,2), (2023,3), (2023,4), (2023,5), (2023,6), (2023,7), (2023,8), (2023,9), (2022,10), (2022,11), (2022,12)]
-
-list_df_months = [load_single_month(spark, year=year, month=month).toPandas() for year, month in daty]
+list_df_months = [load_single_month(spark, year=year, month=month).toPandas() for year, month in [(2023, m) for m in range(1, 10)] + [(2022, m) for m in range(10, 13)]]
 
 """#### Wydzielenie zbiorow danych
 
@@ -172,28 +157,32 @@ list_of_df = [df.loc[:,'Rainf':'SoilM_100_200cm'] for df in list_of_df_all]
 
 """#### Definiowanie funkcji"""
 
-def create_models(params_gs: dict, list_of_df: List[pd.DataFrame], scoring: Optional[str] = 'accuracy') -> tuple[List, List]:
+def create_models(params_gs: dict, list_of_df: List[pd.DataFrame], scoring:str = 'accuracy') -> tuple[List, List]:
+  '''
+  The function uses GridSearch to create DecisionTreeClassifier models. Returns a tuple of lists: ([models], [parameters]).
+  '''
   list_params = []
   list_of_models = []
   number_of_data = len(list_of_df)
 
   for i in range(number_of_data):
+    #GridSearch
     gs = GridSearchCV(tree.DecisionTreeClassifier(random_state = 2024), cv = 5, param_grid = params_gs, scoring = scoring)
     gs.fit(list_of_df[i][0], list_of_df[i][1])
     list_params.append(gs.best_params_)
-
-  for i in range(number_of_data):
+    #Create
     list_of_models.append(tree.DecisionTreeClassifier(random_state = 2024, **list_params[i]))
-
-  for i in range(number_of_data):
+    #Fit
     list_of_models[i].fit(list_of_df[i][0], list_of_df[i][1])
 
   return list_of_models, list_params
 
-def summary_model(model: Any, X:pd.DataFrame, y:pd.DataFrame, labels_names: List) -> None:
+def summary_model(model: BaseEstimator, X:pd.DataFrame, y:pd.DataFrame, labels_names: List) -> None:
+  '''
+  The function displays the confusion matrix for the model.
+  '''
   y_pred = model.predict(X)
-  y_real= y
-  cf_matrix = confusion_matrix(y_real, y_pred)
+  cf_matrix = confusion_matrix(y, y_pred)
   group_counts = ["{0:0.0f}".format(value) for value in cf_matrix.flatten()]
   group_percentages = ["{0:.2%}".format(value) for value in cf_matrix.flatten()/np.sum(cf_matrix)]
   labels = [f"{v1}\n{v2}" for v1, v2 in zip(group_counts,group_percentages)]
@@ -203,72 +192,34 @@ def summary_model(model: Any, X:pd.DataFrame, y:pd.DataFrame, labels_names: List
   plt.ylabel('Rzeczywistość')
   plt.show()
 
-def print_classification_report(model: Any, X: pd.DataFrame, y: pd.DataFrame) -> None:
-  y_predict = model.predict(X)
-  print(classification_report(y, y_predict))
-
-def print_accuracy_heatmap(list_of_models: List[Any], list_of_X_test: List[pd.DataFrame], y_test: List[pd.DataFrame]) -> None:
-  list_accuracy = []
-  for i in range(12):
-    temp = []
-    for j in range(12):
-      temp.append(list_of_models[i].score(list_of_X_test[j],  y_test) *100)
-    list_accuracy.append(temp)
-  miesiace = ['STY', 'LUT', 'MAR', 'KWI', 'MAJ', 'CZE', 'LIP', 'SIE', 'WRZ', 'PAZ', 'LIS', 'GRU']
-  df_accuracy =pd.DataFrame(list_accuracy, index=miesiace, columns=miesiace)
-  plt.figure(figsize=(10,8))
-  sns.heatmap(df_accuracy, annot=True)
-  plt.xlabel('Miesiace - test')
-  plt.ylabel('Miesiace - model')
-  plt.title("Accuracy")
-
-def print_recall_heatmap(list_of_models: List[Any], list_of_X_test: List[pd.DataFrame], y_test: List[pd.DataFrame]) -> None:
-  list_recall = []
+def print_heatmap(list_of_models: List[BaseEstimator], list_of_X_test: List[pd.DataFrame], y_test: List[pd.DataFrame], type_of_heatmap: str) -> None:
+  '''
+  The function displays a heat map for the indicated model list. On the map you can display: accuracy, recall, precision, F1.
+  '''
+  types_available = {'Accuracy', 'Recall', 'Precision', 'F1'}
+  if type_of_heatmap not in types_available:
+        raise ValueError("results: status must be one of %r." % types_available)
+  list_of_values = []
   for i in range(12):
     temp = []
     for j in range(12):
       y_pred = list_of_models[i].predict(list_of_X_test[j])
-      temp.append(recall_score(y_pred,  y_test) *100)
-    list_recall.append(temp)
+      if type_of_heatmap == 'Accuracy':
+        temp.append(accuracy_score(y_test, y_pred) *100)
+      elif type_of_heatmap == 'Recall':
+        temp.append(recall_score(y_test, y_pred) *100)
+      elif type_of_heatmap == 'Precision':
+        temp.append(precision_score(y_test, y_pred) *100)
+      elif type_of_heatmap == 'F1':
+        temp.append(f1_score(y_test, y_pred) *100)
+    list_of_values.append(temp)
   miesiace = ['STY', 'LUT', 'MAR', 'KWI', 'MAJ', 'CZE', 'LIP', 'SIE', 'WRZ', 'PAZ', 'LIS', 'GRU']
-  df_recall =pd.DataFrame(list_recall, index=miesiace, columns=miesiace)
+  df = pd.DataFrame(list_of_values, index=miesiace, columns=miesiace)
   plt.figure(figsize=(10,8))
-  sns.heatmap(df_recall, annot=True)
+  sns.heatmap(df, annot=True)
   plt.xlabel('Miesiace - test')
   plt.ylabel('Miesiace - model')
-  plt.title("Recall")
-
-def print_precision_heatmap(list_of_models: List[Any], list_of_X_test: List[pd.DataFrame], y_test: List[pd.DataFrame]) -> None:
-  list_precision = []
-  for i in range(12):
-    temp = []
-    for j in range(12):
-      y_pred = list_of_models[i].predict(list_of_X_test[j])
-      temp.append(precision_score(y_pred,  y_test) *100)
-    list_precision.append(temp)
-  miesiace = ['STY', 'LUT', 'MAR', 'KWI', 'MAJ', 'CZE', 'LIP', 'SIE', 'WRZ', 'PAZ', 'LIS', 'GRU']
-  df_precision =pd.DataFrame(list_precision, index=miesiace, columns=miesiace)
-  plt.figure(figsize=(10,8))
-  sns.heatmap(df_precision, annot=True)
-  plt.xlabel('Miesiace - test')
-  plt.ylabel('Miesiace - model')
-  plt.title("Precision")
-
-def print_f1_heatmap(list_of_models: List[Any], list_of_X_test: List[pd.DataFrame], y_test: List[pd.DataFrame]) -> None:
-  list_f1 = []
-  for i in range(12):
-    temp = []
-    for j in range(12):
-      y_pred = list_of_models[i].predict(list_of_X_test[j])
-      temp.append(f1_score(y_pred,  y_test) *100)
-    list_f1.append(temp)
-  miesiace = ['STY', 'LUT', 'MAR', 'KWI', 'MAJ', 'CZE', 'LIP', 'SIE', 'WRZ', 'PAZ', 'LIS', 'GRU']
-  df_f1 =pd.DataFrame(list_f1, index=miesiace, columns=miesiace)
-  plt.figure(figsize=(10,8))
-  sns.heatmap(df_f1, annot=True)
-  plt.xlabel('Miesiace - test')
-  plt.ylabel('Miesiace - model')
-  plt.title("F1")
+  plt.title(type_of_heatmap)
 
 class BalanceDataSet():
   '''
@@ -277,26 +228,38 @@ class BalanceDataSet():
   def __init__(
       self,
       X: pd.DataFrame,
-      y: pd.DataFrame
+      y: pd.DataFrame,
+      random_seed: int = 2023
       ) -> None:
       self.X = X
       self.y = y
       assert len(self.X)==len(self.y)
+      self.random_seed = random_seed
+      self.oversample = RandomOverSampler(sampling_strategy='auto', random_state=random_seed)
+      self.smote = SMOTE(random_state=random_seed)
 
   def useOverSampling(
       self,
-      randon_seed: Optional[int] = 2023
       ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    oversample = RandomOverSampler( sampling_strategy='auto',
-                  random_state=randon_seed)
-    return oversample.fit_resample(self.X, self.y)
+    return self.oversample.fit_resample(self.X, self.y)
 
   def useSMOTE(
       self,
-      randon_seed: Optional[int] = 2023
       ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    smote = SMOTE(random_state=randon_seed)
-    return smote.fit_resample(self.X, self.y)
+    return self.smote.fit_resample(self.X, self.y)
+
+def plot_data_dist(y: pd.DataFrame) -> None:
+  '''
+  The function displays the distribution of data in the sample.
+  '''
+  dane = pd.Series(y).value_counts().sort_index()
+  labels = list(np.sort(pd.unique(y)))
+  ypos=np.arange(len(labels))
+  plt.xticks(ypos, labels)
+  plt.xlabel('Klasa')
+  plt.ylabel('Czestosc')
+  plt.title('Liczebnosc dla proby')
+  plt.bar(ypos,dane)
 
 def get_colormap(values: list, colors_palette: list, name = 'custom'):
     """
@@ -332,10 +295,18 @@ def plot_map(df: pd.DataFrame, parameter_name: str, colormap: mpl_colors.LinearS
     )
     return hv.render(map_with_points)
 
-def plot_map_from_model(model, df: pd.DataFrame, title:Optional[str]='', col:Optional[int] = 1 ) -> None:
-  assert col in [-1,1]
+def plot_map_from_model(model: BaseEstimator, df: pd.DataFrame, title:Optional[str]='', col:int = 2) -> None:
+  '''
+  The function displays a map for the indicated model.
+  '''
+  assert col in {1,2,3}
   df['Model'] = model.predict(df.loc[:,'Rainf':'SoilM_100_200cm'])
-  colormap_cluster = get_colormap([0, max(df.Model.values)], ['darkgreen', 'yellow'][::col])
+  if col == 1:
+    colormap_cluster=dict(zip(['1','2', '3'], ['yellow','#99B300', 'green']))
+  elif col == 3:
+    colormap_cluster=dict(zip(['1','0'], ['#99B300', 'green']))
+  else:
+    colormap_cluster=dict(zip(['1','0'], ['yellow', 'green']))
   plot = plot_map(df=df, parameter_name='Model', colormap=colormap_cluster, title=title, alpha=1)
   output_notebook()
   show(plot)
@@ -488,11 +459,11 @@ W tym rozdziale zostana przedstawione mapy ciepla obrazujace wartosci roznych st
 Accuracy na zbiorze treningowym.
 """
 
-print_accuracy_heatmap(list_of_models_m1, [i[0] for i in list_of_df_m1_tr], list_of_df_m1_tr[0][1])
+print_heatmap(list_of_models_m1, [i[0] for i in list_of_df_m1_tr], list_of_df_m1_tr[0][1], 'Accuracy')
 
 """Accuracy na zbiorze testowym."""
 
-print_accuracy_heatmap(list_of_models_m1, [i[0] for i in list_of_df_m1_te], list_of_df_m1_te[0][1])
+print_heatmap(list_of_models_m1, [i[0] for i in list_of_df_m1_te], list_of_df_m1_te[0][1], 'Accuracy')
 
 """##### Wnioski
 
@@ -504,14 +475,14 @@ Zbior treningowy
 """
 
 summary_model(list_of_models_m1[5], list_of_df_m1_tr[5][0], list_of_df_m1_tr[5][1], ['1','2','3'])
-print_classification_report(list_of_models_m1[5], list_of_df_m1_tr[5][0], list_of_df_m1_tr[5][1])
+print(classification_report(list_of_df_m1_tr[5][1], list_of_models_m1[5].predict(list_of_df_m1_tr[5][0])))
 
 """Zbior testowy"""
 
 summary_model(list_of_models_m1[5], list_of_df_m1_te[5][0], list_of_df_m1_te[5][1], ['1','2','3'])
-print_classification_report(list_of_models_m1[5], list_of_df_m1_te[5][0], list_of_df_m1_te[5][1])
+print(classification_report(list_of_df_m1_te[5][1], list_of_models_m1[5].predict(list_of_df_m1_te[5][0])))
 
-plot_map_from_model(list_of_models_m1[5], list_df_months[5], "Czerwiec - detekcja pustynia (1) - step(2) - inne(3)",-1)
+plot_map_from_model(list_of_models_m1[5], list_df_months[5], "Czerwiec - detekcja pustynia (1) - step(2) - inne(3)", 1)
 
 """Porownujac otrzymana mape z danymi o strukturamch pustyn w Ameryce zauwazamy, ze model nie rozpoznaje zimnych pustyn na granicy USA i Kanady. Klasyfikator myli sie rowniez w okolicy Bahamow - uznaje je za pustynie.
 
@@ -520,23 +491,23 @@ plot_map_from_model(list_of_models_m1[5], list_df_months[5], "Czerwiec - detekcj
 Accuracy na zbiorze treningowym.
 """
 
-print_accuracy_heatmap(list_of_models_m2, [i[0] for i in list_of_df_m2_tr], list_of_df_m2_tr[0][1])
+print_heatmap(list_of_models_m2, [i[0] for i in list_of_df_m2_tr], list_of_df_m2_tr[0][1], 'Accuracy')
 
 """Accuracy na zbiorze testowym."""
 
-print_accuracy_heatmap(list_of_models_m2, [i[0] for i in list_of_df_m2_te], list_of_df_m2_te[0][1])
+print_heatmap(list_of_models_m2, [i[0] for i in list_of_df_m2_te], list_of_df_m2_te[0][1], 'Accuracy')
 
 """Recall na zbiorze testowym."""
 
-print_recall_heatmap(list_of_models_m2, [i[0] for i in list_of_df_m2_te], list_of_df_m2_te[0][1])
+print_heatmap(list_of_models_m2, [i[0] for i in list_of_df_m2_te], list_of_df_m2_te[0][1], 'Recall')
 
 """Precision na zbiorze testowym."""
 
-print_precision_heatmap(list_of_models_m2, [i[0] for i in list_of_df_m2_te], list_of_df_m2_te[0][1])
+print_heatmap(list_of_models_m2, [i[0] for i in list_of_df_m2_te], list_of_df_m2_te[0][1], 'Precision')
 
 """F1 na zbiorze testowym."""
 
-print_f1_heatmap(list_of_models_m2, [i[0] for i in list_of_df_m2_te], list_of_df_m2_te[0][1])
+print_heatmap(list_of_models_m2, [i[0] for i in list_of_df_m2_te], list_of_df_m2_te[0][1], 'F1')
 
 """##### Wnioski
 
@@ -548,14 +519,14 @@ Zbior treningowy
 """
 
 summary_model(list_of_models_m2[7], list_of_df_m2_tr[7][0], list_of_df_m2_tr[7][1], ['0','1'])
-print_classification_report(list_of_models_m2[7], list_of_df_m2_tr[7][0], list_of_df_m2_tr[7][1])
+print(classification_report(list_of_df_m2_tr[7][1], list_of_models_m2[7].predict(list_of_df_m2_tr[7][0])))
 
 """Zbior testowy"""
 
 summary_model(list_of_models_m2[7], list_of_df_m2_te[7][0], list_of_df_m2_te[7][1], ['0','1'])
-print_classification_report(list_of_models_m2[7], list_of_df_m2_te[7][0], list_of_df_m2_te[7][1])
+print(classification_report(list_of_df_m2_te[7][1], list_of_models_m2[7].predict(list_of_df_m2_te[7][0])))
 
-plot_map_from_model(list_of_models_m2[7], list_df_months[7], "Sierpien - detekcja pustynia (1) - niepustynia (0)")
+plot_map_from_model(list_of_models_m2[7], list_df_months[7], "Sierpien - detekcja pustynia (1) - niepustynia (0)", 2)
 
 """Porownujac otrzymana mape z danymi o strukturamch pustyn w Ameryce zauwazamy, ze model nie rozpoznaje jednej z zimnowych pustyn na granicy USA i Kanady. Klasyfikator myli sie podobnie w okolicy Bahamow - uznaje je za pustynie oraz nad Zatoka Meksykanska.
 
@@ -564,23 +535,23 @@ plot_map_from_model(list_of_models_m2[7], list_df_months[7], "Sierpien - detekcj
 Accuracy na zbiorze treningowym.
 """
 
-print_accuracy_heatmap(list_of_models_m3, [i[0] for i in list_of_df_m3_tr], list_of_df_m3_tr[0][1])
+print_heatmap(list_of_models_m3, [i[0] for i in list_of_df_m3_tr], list_of_df_m3_tr[0][1], 'Accuracy')
 
 """Accuracy na zbiorze testowym."""
 
-print_accuracy_heatmap(list_of_models_m3, [i[0] for i in list_of_df_m3_te], list_of_df_m3_te[0][1])
+print_heatmap(list_of_models_m3, [i[0] for i in list_of_df_m3_te], list_of_df_m3_te[0][1], 'Accuracy')
 
 """Recall na zbiorze testowym."""
 
-print_recall_heatmap(list_of_models_m3, [i[0] for i in list_of_df_m3_te], list_of_df_m3_te[0][1])
+print_heatmap(list_of_models_m3, [i[0] for i in list_of_df_m3_te], list_of_df_m3_te[0][1], 'Recall')
 
 """Precision na zbiorze testowym."""
 
-print_precision_heatmap(list_of_models_m3, [i[0] for i in list_of_df_m3_te], list_of_df_m3_te[0][1])
+print_heatmap(list_of_models_m3, [i[0] for i in list_of_df_m3_te], list_of_df_m3_te[0][1], 'Precision')
 
 """F1 na zbiorze testowym."""
 
-print_f1_heatmap(list_of_models_m3, [i[0] for i in list_of_df_m3_te], list_of_df_m3_te[0][1])
+print_heatmap(list_of_models_m3, [i[0] for i in list_of_df_m3_te], list_of_df_m3_te[0][1], 'F1')
 
 """##### Wnioski
 
@@ -592,36 +563,31 @@ Zbior treningowy
 """
 
 summary_model(list_of_models_m3[5], list_of_df_m3_tr[5][0], list_of_df_m3_tr[5][1], ['0','1'])
-print_classification_report(list_of_models_m3[5], list_of_df_m3_tr[5][0], list_of_df_m3_tr[5][1])
+print(classification_report(list_of_df_m3_tr[5][1], list_of_models_m3[5].predict(list_of_df_m3_tr[5][0])))
 
 """Zbior testowy"""
 
 summary_model(list_of_models_m3[5], list_of_df_m3_te[5][0], list_of_df_m3_te[5][1], ['0','1'])
-print_classification_report(list_of_models_m3[5], list_of_df_m3_te[5][0], list_of_df_m3_te[5][1])
+print(classification_report(list_of_df_m3_te[5][1], list_of_models_m3[5].predict(list_of_df_m3_te[5][0])))
 
-plot_map_from_model(list_of_models_m3[5], list_df_months[5],"Czerwiec - detekcja step (1) - niestep (0)")
+plot_map_from_model(list_of_models_m3[5], list_df_months[5],"Czerwiec - detekcja step (1) - niestep (0)", 3)
 
 """Klasyfikacja mozna uznać za poprawna, niektore putynie uznane sa za stepy. Problemem sa małe, rozproszone obszary wschodniej czesci kontynentu, w innych zrodlach nie ma tam stepow.
 
 ### Zapisanie modeli
 """
 
-model_m1_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Model_m1/'
-model_m2_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Model_m2/'
-model_m3_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Model_m3/'
+models_path = '/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/'
 
-model_names = ['01','02','03','04','05','06','07','08','09','10','11','12']
-
-for i in range(12):
-  with open(model_m1_path+model_names[i], 'wb') as files:
+for month in range(12):
+  #Model 1
+  with open(models_path+f'Model_m1/{month+1:02d}', 'wb') as files:
     pickle.dump(list_of_models_m1[i], files)
-
-for i in range(12):
-  with open(model_m2_path+model_names[i], 'wb') as files:
+  #Model 2
+  with open(models_path+f'Model_m2/{month+1:02d}', 'wb') as files:
     pickle.dump(list_of_models_m2[i], files)
-
-for i in range(12):
-  with open(model_m3_path+model_names[i], 'wb') as files:
+  #Model 3
+  with open(models_path+f'Model_m3/{month+1:02d}', 'wb') as files:
     pickle.dump(list_of_models_m3[i], files)
 
 """## Przedstawienie wynikow na mapach"""
@@ -633,39 +599,39 @@ display(IFrame("https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d13982681.9
 Do klasyfikacji wykorzytamy modele zbudowane na danych lipcowych. Dane z tego miesiaca byly uznane przez zespol za najlepsze do identyfikacji terenow pustynnych.
 """
 
-plot_map_from_model(list_of_models_m1[6], list_df_months[6], "Detekcja pustynia (1) - step(2) - inne(3)",-1)
+plot_map_from_model(list_of_models_m1[6], list_df_months[6], "Detekcja pustynia (1) - step(2) - inne(3)",1)
 
-plot_map_from_model(list_of_models_m2[6], list_df_months[6], "Detekcja pustynia (1) - niepustynia (0)")
+plot_map_from_model(list_of_models_m2[6], list_df_months[6], "Detekcja pustynia (1) - niepustynia (0)",2)
 
-plot_map_from_model(list_of_models_m3[6], list_df_months[6],"Detekcja step (1) - niestep (0)")
+plot_map_from_model(list_of_models_m3[6], list_df_months[6],"Detekcja step (1) - niestep (0)", 3)
 
 """### Dane z 06.2023
 
 Do klasyfikacji wykorzystamy modele zbudowane na danych listopadowych. Eksperyment ma na celu przetestowania klasyfikatorow na danych innych niz miesiac ich budowy.
 """
 
-plot_map_from_model(list_of_models_m1[10], list_df_months[5], "Detekcja pustynia (1) - step(2) - inne(3)",-1)
+plot_map_from_model(list_of_models_m1[10], list_df_months[5], "Detekcja pustynia (1) - step(2) - inne(3)",1)
 
-plot_map_from_model(list_of_models_m2[10], list_df_months[5], "Detekcja pustynia (1) - niepustynia (0)")
+plot_map_from_model(list_of_models_m2[10], list_df_months[5], "Detekcja pustynia (1) - niepustynia (0)", 2)
 
-plot_map_from_model(list_of_models_m3[10], list_df_months[5],"Detekcja step (1) - niestep (0)",1)
+plot_map_from_model(list_of_models_m3[10], list_df_months[5],"Detekcja step (1) - niestep (0)",3)
 
 """### Klasyfikacja pustynia-step-inne dla kazdego miesiaca"""
 
 miesiace = ['Styczen - ', 'Luty - ', 'Marzec - ', 'Kwiecien - ', 'Maj - ', 'Czerwiec - ', 'Lipiec - ', 'Sierpien - ', 'Wrzesien - ', 'Pazdziernik - ', 'Listopad - ', 'Grudzien - ']
 for i in range(12):
-  plot_map_from_model(list_of_models_m1[i], list_df_months[i], miesiace[i]+"detekcja pustynia (1) - step(2) - inne(3)",-1)
+  plot_map_from_model(list_of_models_m1[i], list_df_months[i], miesiace[i]+"detekcja pustynia (1) - step(2) - inne(3)",1)
 
 """### Klasyfikacja pustyn dla kazdego miesiaca"""
 
 for i in range(12):
-  plot_map_from_model(list_of_models_m2[i], list_df_months[i], miesiace[i]+"detekcja pustynia (1) - niepustynia (0)")
+  plot_map_from_model(list_of_models_m2[i], list_df_months[i], miesiace[i]+"detekcja pustynia (1) - niepustynia (0)",2)
 
 """## Lasy losowe
 
 **Metoda**:
 
-Do modelowania uzyto metody lasow losowych oraz wykorzytano te miesiace ktore okazly sie najlepsze w modelach drzew decyzyjnych.
+Do modelowania uzyto metody lasow losowych oraz wykorzystano te miesiace ktore okazaly sie najlepsze w modelach drzew decyzyjnych.
 
 Zdefiniujmy slownik paramentow modelu ktory bedzie wykorzystany w metodzie GridSearchCV.
 """
@@ -689,14 +655,14 @@ las_m1.fit(list_of_df_m1_tr[5][0], list_of_df_m1_tr[5][1])
 """Zbior treningowy"""
 
 summary_model(las_m1, list_of_df_m1_tr[5][0], list_of_df_m1_tr[5][1], ['1','2','3'])
-print_classification_report(las_m1, list_of_df_m1_tr[5][0], list_of_df_m1_tr[5][1])
+print(classification_report(list_of_df_m1_tr[5][1], las_m1.predict(list_of_df_m1_tr[5][0])))
 
 """Zbior testowy"""
 
 summary_model(las_m1, list_of_df_m1_te[5][0], list_of_df_m1_te[5][1], ['1','2','3'])
-print_classification_report(las_m1, list_of_df_m1_te[5][0], list_of_df_m1_te[5][1])
+print(classification_report(list_of_df_m1_te[5][1], las_m1.predict(list_of_df_m1_te[5][0])))
 
-plot_map_from_model(las_m1, list_df_months[5], "Czerwiec - detekcja pustynia (1) - step(2) - inne(3)",-1)
+plot_map_from_model(las_m1, list_df_months[5], "Czerwiec - detekcja pustynia (1) - step(2) - inne(3)", 1)
 
 """Model o wynikach podobnych do modelu drzew decyzyjnych.
 
@@ -717,14 +683,14 @@ las_m2.fit(list_of_df_m2_tr[7][0], list_of_df_m2_tr[7][1])
 """Zbior treningowy"""
 
 summary_model(las_m2, list_of_df_m2_tr[7][0], list_of_df_m2_tr[7][1], ['0','1'])
-print_classification_report(las_m2, list_of_df_m2_tr[7][0], list_of_df_m2_tr[7][1])
+print(classification_report(list_of_df_m2_tr[7][1], las_m2.predict(list_of_df_m2_tr[7][0])))
 
 """Zbior testowy"""
 
 summary_model(las_m2, list_of_df_m2_te[7][0], list_of_df_m2_te[7][1], ['0','1'])
-print_classification_report(las_m2, list_of_df_m2_te[7][0], list_of_df_m2_te[7][1])
+print(classification_report(list_of_df_m2_te[7][1], las_m2.predict(list_of_df_m2_te[7][0])))
 
-plot_map_from_model(las_m2, list_df_months[7], "Sierpien - detekcja pustynia (1) - niepustynia (0)")
+plot_map_from_model(las_m2, list_df_months[7], "Sierpien - detekcja pustynia (1) - niepustynia (0)", 2)
 
 """**Lipiec**"""
 
@@ -740,16 +706,16 @@ las_m2_7.fit(list_of_df_m2_tr[6][0], list_of_df_m2_tr[6][1])
 """Zbior treningowy"""
 
 summary_model(las_m2_7, list_of_df_m2_tr[6][0], list_of_df_m2_tr[6][1], ['0','1'])
-print_classification_report(las_m2_7, list_of_df_m2_tr[6][0], list_of_df_m2_tr[6][1])
+print(classification_report(list_of_df_m2_tr[6][1], las_m2_7.predict(list_of_df_m2_tr[6][0])))
 
 """Zbior testowy"""
 
 summary_model(las_m2_7, list_of_df_m2_te[6][0], list_of_df_m2_te[6][1], ['0','1'])
-print_classification_report(las_m2_7, list_of_df_m2_te[6][0], list_of_df_m2_te[6][1])
+print(classification_report(list_of_df_m2_te[6][1], las_m2_7.predict(list_of_df_m2_te[6][0])))
 
 plot_map_from_model(las_m2_7, list_df_months[6], "Lipiec - detekcja pustynia (1) - niepustynia (0)")
 
-"""Lepsze wyniki otrzymano dla danych z lipca. Model osiągnal 92% accuracy, 89% precision oraz 57% recall. Klasyfikator lasow losowych zbudowany na tych danych wydaje sie być jednym z lepszych. Widac sklasyfikowane zimne pustynie na granicy USA i Kandy. Nieprawidlowo sklasyfikowano obszary nad Zatoka Meksykanska.
+"""Lepsze wyniki otrzymano dla danych z lipca. Model osiągnal 92% accuracy, 89% recall oraz 57% precision. Klasyfikator lasow losowych zbudowany na tych danych wydaje sie być jednym z lepszych. Widac sklasyfikowane zimne pustynie na granicy USA i Kandy. Nieprawidlowo sklasyfikowano obszary nad Zatoka Meksykanska.
 
 ### Model 3 - detekcja step - niestep
 
@@ -766,42 +732,37 @@ las_m3.fit(list_of_df_m3_tr[5][0], list_of_df_m3_tr[5][1])
 """Zbior treningowy"""
 
 summary_model(las_m3, list_of_df_m3_tr[5][0], list_of_df_m3_tr[5][1], ['0','1'])
-print_classification_report(las_m3, list_of_df_m3_tr[5][0], list_of_df_m3_tr[5][1])
+print(classification_report(list_of_df_m3_tr[5][1], las_m3.predict(list_of_df_m3_tr[5][0])))
 
 """Zbior testowy"""
 
 summary_model(las_m3, list_of_df_m3_te[5][0], list_of_df_m3_te[5][1], ['0','1'])
-print_classification_report(las_m3, list_of_df_m3_te[5][0], list_of_df_m3_te[5][1])
+print(classification_report(list_of_df_m3_te[5][1], las_m3.predict(list_of_df_m3_te[5][0])))
 
-plot_map_from_model(las_m3, list_df_months[5], "Czerwiec - detekcja step (1) - niestep (0)")
+plot_map_from_model(las_m3, list_df_months[5], "Czerwiec - detekcja step (1) - niestep (0)", 3)
 
 """Model nieznacznie lepszy od modelu drzew decyzyjnych zbudowanego na tym samym miesiacu. Udalo sie zdecydowanie ograniczyc liczbe obszarow uznanych za stepy w wschodniej czesci kontynentu.
 
 ### Zapisanie modeli
 """
 
-model_las_m1_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Lasy/las_m1'
-model_las_m2_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Lasy/las_m2'
-model_las_m2_7_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Lasy/las_m2_7'
-model_las_m3_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Lasy/las_m3'
-
-with open(model_las_m1_path, 'wb') as files:
+with open(models_path+'Lasy/las_m1', 'wb') as files:
   pickle.dump(las_m1, files)
 
-with open(model_las_m2_path, 'wb') as files:
+with open(models_path+'Lasy/las_m2', 'wb') as files:
   pickle.dump(las_m2, files)
 
-with open(model_las_m2_7_path, 'wb') as files:
+with open(models_path+'Lasy/las_m2_7', 'wb') as files:
   pickle.dump(las_m2_7, files)
 
-with open(model_las_m3_path, 'wb') as files:
+with open(models_path+'Lasy/las_m3', 'wb') as files:
   pickle.dump(las_m3, files)
 
 """## Light GBM
 
 **Metoda**:
 
-Do modelowania uzyto metody LightGBM oraz wykorzytano te miesiace ktore okazly sie najlepsze w modelach drzew decyzyjnych.
+Do modelowania uzyto metody LightGBM oraz wykorzystano te miesiace ktore okazaly sie najlepsze w modelach drzew decyzyjnych.
 
 Zdefiniujmy slownik paramentow modelu ktory bedzie wykorzystany w metodzie GridSearchCV.
 """
@@ -825,14 +786,14 @@ lgbm_m1.fit(list_of_df_m1_tr[5][0], list_of_df_m1_tr[5][1])
 """Zbior treningowy"""
 
 summary_model(lgbm_m1, list_of_df_m1_tr[5][0], list_of_df_m1_tr[5][1], ['1','2','3'])
-print_classification_report(lgbm_m1, list_of_df_m1_tr[5][0], list_of_df_m1_tr[5][1])
+print(classification_report(list_of_df_m1_tr[5][1], lgbm_m1.predict(list_of_df_m1_tr[5][0])))
 
 """Zbior testowy"""
 
 summary_model(lgbm_m1, list_of_df_m1_te[5][0], list_of_df_m1_te[5][1], ['1','2','3'])
-print_classification_report(lgbm_m1, list_of_df_m1_te[5][0], list_of_df_m1_te[5][1])
+print(classification_report(list_of_df_m1_te[5][1], lgbm_m1.predict(list_of_df_m1_te[5][0])))
 
-plot_map_from_model(lgbm_m1, list_df_months[5], "Czerwiec - detekcja pustynia (1) - step(2) - inne(3)",-1)
+plot_map_from_model(lgbm_m1, list_df_months[5], "Czerwiec - detekcja pustynia (1) - step(2) - inne(3)",1)
 
 """Model o wynikach podobnych do modelu drzew decyzyjnych i lasow losowych. Widac ograniczenie w klasyfikacji pustyn w okolocy Bahamow.
 
@@ -853,14 +814,14 @@ lgbm_m2.fit(list_of_df_m2_tr[7][0], list_of_df_m2_tr[7][1])
 """Zbior treningowy"""
 
 summary_model(lgbm_m2, list_of_df_m2_tr[7][0], list_of_df_m2_tr[7][1], ['0','1'])
-print_classification_report(lgbm_m2, list_of_df_m2_tr[7][0], list_of_df_m2_tr[7][1])
+print(classification_report(list_of_df_m2_tr[7][1], lgbm_m2.predict(list_of_df_m2_tr[7][0])))
 
 """Zbior testowy"""
 
 summary_model(lgbm_m2, list_of_df_m2_te[7][0], list_of_df_m2_te[7][1], ['0','1'])
-print_classification_report(lgbm_m2, list_of_df_m2_te[7][0], list_of_df_m2_te[7][1])
+print(classification_report(list_of_df_m2_te[7][1], lgbm_m2.predict(list_of_df_m2_te[7][0])))
 
-plot_map_from_model(lgbm_m2, list_df_months[7], "Sierpien - detekcja pustynia (1) - niepustynia (0)")
+plot_map_from_model(lgbm_m2, list_df_months[7], "Sierpien - detekcja pustynia (1) - niepustynia (0)", 2)
 
 """**Lipiec**"""
 
@@ -876,14 +837,14 @@ gs_lgbm_m2_7.best_params_
 """Zbior treningowy"""
 
 summary_model(lgbm_m2_7, list_of_df_m2_tr[6][0], list_of_df_m2_tr[6][1], ['0','1'])
-print_classification_report(lgbm_m2_7, list_of_df_m2_tr[6][0], list_of_df_m2_tr[6][1])
+print(classification_report(list_of_df_m2_tr[6][1], lgbm_m2_7.predict(list_of_df_m2_tr[6][0])))
 
 """Zbior testowy"""
 
 summary_model(lgbm_m2_7, list_of_df_m2_te[6][0], list_of_df_m2_te[6][1], ['0','1'])
-print_classification_report(lgbm_m2_7, list_of_df_m2_te[6][0], list_of_df_m2_te[6][1])
+print(classification_report(list_of_df_m2_te[6][1], lgbm_m2_7.predict(list_of_df_m2_te[6][0])))
 
-plot_map_from_model(lgbm_m2_7, list_df_months[6], "Lipiec - detekcja pustynia (1) - niepustynia (0)")
+plot_map_from_model(lgbm_m2_7, list_df_months[6], "Lipiec - detekcja pustynia (1) - niepustynia (0)", 2)
 
 """Lepsze wyniki otrzymano dla danych z lipca. W porownaniu do modeli drzew i lasow ten kalsyfikator dziala lepiej w rejonie Zatoki Meksykanskiej, jednak minimalnie gorzej klasyfikuje pustynie zimne.
 
@@ -902,35 +863,30 @@ lgbm_m3.fit(list_of_df_m3_tr[5][0], list_of_df_m3_tr[5][1])
 """Zbior treningowy"""
 
 summary_model(lgbm_m3, list_of_df_m3_tr[5][0], list_of_df_m3_tr[5][1], ['0','1'])
-print_classification_report(lgbm_m3, list_of_df_m3_tr[5][0], list_of_df_m3_tr[5][1])
+print(classification_report(list_of_df_m3_tr[5][1], lgbm_m3.predict(list_of_df_m3_tr[5][0])))
 
 """Zbior testowy"""
 
 summary_model(lgbm_m3, list_of_df_m3_te[5][0], list_of_df_m3_te[5][1], ['0','1'])
-print_classification_report(lgbm_m3, list_of_df_m3_te[5][0], list_of_df_m3_te[5][1])
+print(classification_report(list_of_df_m3_te[5][1], lgbm_m3.predict(list_of_df_m3_te[5][0])))
 
-plot_map_from_model(lgbm_m3, list_df_months[5], "Czerwiec - detekcja step (1) - niestep (0)")
+plot_map_from_model(lgbm_m3, list_df_months[5], "Czerwiec - detekcja step (1) - niestep (0)", 3)
 
 """Model podobny jakosciowo to poprzednich klasyfikatorow step - niestep.
 
 ### Zapisanie modeli
 """
 
-model_lgbm_m1_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/LightGBM/lgbm_m1'
-model_lgbm_m2_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/LightGBM/lgbm_m2'
-model_lgbm_m2_7_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/LightGBM/lgbm_m2_7'
-model_lgbm_m3_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/LightGBM/lgbm_m3'
-
-with open(model_lgbm_m1_path, 'wb') as files:
+with open(models_path+'LightGBM/lgbm_m1', 'wb') as files:
   pickle.dump(lgbm_m1, files)
 
-with open(model_lgbm_m2_path, 'wb') as files:
+with open(models_path+'LightGBM/lgbm_m2', 'wb') as files:
   pickle.dump(lgbm_m2, files)
 
-with open(model_lgbm_m2_7_path, 'wb') as files:
+with open(models_path+'LightGBM/lgbm_m2_7', 'wb') as files:
   pickle.dump(lgbm_m2_7, files)
 
-with open(model_lgbm_m3_path, 'wb') as files:
+with open(models_path+'LightGBM/lgbm_m3', 'wb') as files:
   pickle.dump(lgbm_m3, files)
 
 """## Uwzglednienie wartosci *lat* w modelu pustynia - niepustynia
@@ -960,22 +916,22 @@ las_m2_lat.fit(july_X_tr, july_y_tr)
 
 """Zbior treningowy"""
 
-summary_model(las_m2_lat, july_X_te, july_y_te, ['0','1'])
-print_classification_report(las_m2_lat, july_X_te, july_y_te)
+summary_model(las_m2_lat, july_X_tr, july_y_tr, ['0','1'])
+print(classification_report(july_y_tr, las_m2_lat.predict(july_X_tr)))
 
 """Zbior testowy"""
 
 summary_model(las_m2_lat, july_X_te, july_y_te, ['0','1'])
-print_classification_report(las_m2_lat, july_X_te, july_y_te)
+print(classification_report(july_y_te, las_m2_lat.predict(july_X_te)))
 
 df_july = list_df_months[6]
 df_july['las_m2_lat'] = las_m2_lat.predict(df_july.loc[:,'lat':'SoilM_100_200cm'])
-colormap_cluster = get_colormap([0, max(df_july.las_m2_lat.values)], ['darkgreen', 'yellow'])
+colormap_cluster=dict(zip(['1','0'], ['yellow', 'green']))
 plot_las_july = plot_map(df=df_july, parameter_name='las_m2_lat', colormap=colormap_cluster, title="Lipiec - detekcja pustynia (1) - niepustynia (0)", alpha=1)
 output_notebook()
 show(plot_las_july)
 
-"""Model ma lepszy recall 89% (wieksze o o 9 p.p. od modelu drzew bez *lat*) oraz gorszy precision 70% (mniejsze o 19% p.p. od modelu drzew bez *lat*). Interpretujac powyzsza mape widzimy, ze ten model nie ma problemu z obszarami nad Zatoka Meksykanska. Zmniejszyla sie natomiast poprawnosc klasyfikacji zimnych pustyn.
+"""Model ma lepsze precision 66% (wieksze o 9 p.p. od modelu drzew bez *lat*) oraz gorsze recall 70% (mniejsze o 19% p.p. od modelu drzew bez *lat*). Interpretujac powyzsza mape widzimy, ze ten model nie ma problemu z obszarami nad Zatoka Meksykanska. Zmniejszyla sie natomiast poprawnosc klasyfikacji zimnych pustyn.
 
 ### Light GBM
 
@@ -992,15 +948,15 @@ lgbm_m2_lat.fit(july_X_tr, july_y_tr)
 """Zbior treningowy"""
 
 summary_model(lgbm_m2_lat, july_X_tr, july_y_tr, ['0','1'])
-print_classification_report(lgbm_m2_lat, july_X_tr, july_y_tr)
+print(classification_report(july_y_tr, lgbm_m2_lat.predict(july_X_tr)))
 
 """Zbior testowy"""
 
 summary_model(lgbm_m2_lat, july_X_te, july_y_te, ['0','1'])
-print_classification_report(lgbm_m2_lat, july_X_te, july_y_te)
+print(classification_report(july_y_te, lgbm_m2_lat.predict(july_X_te)))
 
 df_july['lgbm_m2_lat'] = lgbm_m2_lat.predict(df_july.loc[:,'lat':'SoilM_100_200cm'])
-colormap_cluster = get_colormap([0, max(df_july.lgbm_m2_lat.values)], ['darkgreen', 'yellow'])
+colormap_cluster=dict(zip(['1','0'], ['yellow', 'green']))
 plot_lgbm_july = plot_map(df=df_july, parameter_name='lgbm_m2_lat', colormap=colormap_cluster, title="Lipiec - detekcja pustynia (1) - niepustynia (0)", alpha=1)
 output_notebook()
 show(plot_lgbm_july)
@@ -1010,13 +966,10 @@ show(plot_lgbm_july)
 ### Zapisanie modeli
 """
 
-model_las_m2_lat_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Modele_z_lat/las_m2_lat'
-model_lgbm_m2_lat_path='/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Modele_z_lat/lgbm_m2_lat'
-
-with open(model_las_m2_lat_path, 'wb') as files:
+with open(models_path+'Modele_z_lat/las_m2_lat', 'wb') as files:
   pickle.dump(las_m2_lat, files)
 
-with open(model_lgbm_m2_lat_path, 'wb') as files:
+with open(models_path+'Modele_z_lat/lgbm_m2_lat', 'wb') as files:
   pickle.dump(lgbm_m2_lat, files)
 
 """## Podsumowanie
@@ -1027,9 +980,9 @@ W ramach zadania zostało zbudowanychy 18 modeli klasyfikacji pustynia - niepust
 * Light GBM na danych lipcowych - [sciezka do pliku]('/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/LightGBM/lgbm_m2_7')
 * Lasów losowcych z cehcą *lat* na danych lipcowych- [sciezka do pliku]('/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Modele_z_lat/las_m2_lat')
 
-dla tych modeli accuracy wacha się w okolicach 91%, a wartość statytyski F1 w granicach 70%.
+dla tych modeli accuracy wacha się w okolicach 91%, a wartosc statystyki F1 w granicach 70%.
 
-Dla klasyfikacji pustynia - step - inne najlepszy mode to las losowy na danych czerwcowych - [sciezka do pliku]('/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Lasy/las_m1')
+Dla klasyfikacji pustynia - step - inne najlepszy model to las losowy na danych czerwcowych - [sciezka do pliku]('/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/Lasy/las_m1')
 
 Dla klasyfikacji step - niestep najlepszy model to Light GLM na danych czerwcowych - [sciezka do pliku](/content/drive/MyDrive/BigMess/NASA/Modele/Klasyfikacja/LightGBM/lgbm_m3)
 """
