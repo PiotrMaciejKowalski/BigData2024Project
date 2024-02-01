@@ -37,8 +37,7 @@ def overYearMonthStats(df: SparkDataFrame, columns: List[str], n: int) -> SparkD
     :param n: liczba lat wstecz, z których chcemy wyliczyć średnią
     """
 
-    if not columns:
-      raise ValueError("Podana musi zostać co najmniej jedna zmienna")
+    assert columns
 
     windowSpec = Window.partitionBy("lon", "lat", "Month").orderBy("Year").rowsBetween(-n, 0)
 
