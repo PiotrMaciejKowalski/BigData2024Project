@@ -278,7 +278,7 @@ monthly_avg_5_july2023_pred['pustynia'] = best_model_rf.predict(monthly_avg_5_ju
 best_rf = RandomForestClassifier(max_depth=8, min_samples_leaf=4, n_estimators=70, random_state=3)
 X = monthly_avg_5_july2023_an_merge_city.drop(columns=['lon', 'lat', 'pustynia', 'city'])
 y = monthly_avg_5_july2023_an_merge_city['pustynia']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1111)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=992)
 
 rf_monthly_avg_5_july2023_city = deepcopy(best_rf)
 rf_monthly_avg_5_july2023_city.fit(X_train, y_train)
@@ -316,7 +316,7 @@ monthly_avg_4_july2023_pred_lgbm['pustynia'] = best_model_lgbm.predict(monthly_a
 best_lgbm = LGBMClassifier(max_depth=10, n_estimators=120, num_leaves=30, random_state=3)
 X = monthly_avg_4_july2023_an_merge_city.drop(columns=['lon', 'lat', 'pustynia', 'city'])
 y = monthly_avg_4_july2023_an_merge_city['pustynia']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1111)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=992)
 
 lgbm_monthly_avg_4_july2023_city = deepcopy(best_lgbm)
 lgbm_monthly_avg_4_july2023_city.fit(X_train, y_train)
