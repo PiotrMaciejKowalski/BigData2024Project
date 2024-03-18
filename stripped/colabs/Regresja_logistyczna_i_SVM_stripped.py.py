@@ -131,43 +131,6 @@ nasa_full.createOrReplaceTempView("nasa_full")
 # In[ ]:
 
 
-#May_2019_DF = load_anotated(spark, year=2019, month=5, ).toPandas()
-#May_2021_DF = load_anotated(spark, year=2021, month=5).toPandas()
-
-
-# In[ ]:
-
-
-#July_2019_DF = load_anotated(spark, year=2019, month=7).toPandas()
-#July_2021_DF = load_anotated(spark, year=2021, month=7).toPandas()
-
-
-# In[ ]:
-
-
-#August_2019_DF = load_anotated(spark, year=2019, month=8).toPandas()
-#August_2021_DF = load_anotated(spark, year=2021, month=8).toPandas()
-
-
-# In[ ]:
-
-
-#December_2019_DF = load_anotated(spark, year=2019, month=12,).toPandas()
-#December_2021_DF = load_anotated(spark, year=2021, month=12).toPandas()
-
-
-# In[ ]:
-
-
-#January_2019_DF = load_anotated(spark, year=2019, month=1).toPandas()
-#January_2021_DF = load_anotated(spark, year=2021, month=1).toPandas()
-
-
-# (Wszystkie te zrzuty do Pandasa zajmują sumarycznie ok. 50 minut. Poniżej trochę szybsza metoda, zajmuje 20 minut:)
-
-# In[ ]:
-
-
 nasa_anotated = load_anotated(spark)
 nasa_anotated.createOrReplaceTempView("nasa_anotated")
 
@@ -221,7 +184,7 @@ December_2021_DF.reset_index(inplace=True, drop=True)
 
 
 #Funkcja do generowania podzialu na foldy do crosswalidacji blokowej (spatial block crossvalidation)
-#kod ze sprintu 1 musiałam zaadaptowac pod Pandasa
+#kod ze sprintu 1 zaadoptowany pod Pandasa
 
 
 def get_grid(grid_cell_size: float, min_lat: float, max_lat: float,
@@ -952,8 +915,8 @@ def Kfolds_crossvalidation(model: BaseEstimator, folds: np.ndarray, folds_labels
  for i in range(k):
      X_test = folds[i]
      y_test = folds_labels[i]
-     train_folds = [fold for fold in folds if fold.tolist() != folds[i].tolist()]
-     train_labels = [labels for labels in folds_labels if labels != folds_labels[i]]
+     train_folds = [folds[j] for j in range(folds) if j!=i]
+     train_labels = [folds_labels[j] for j in range(folds_labels) if j!=i]
      X_train = np.concatenate(train_folds)
      y_train = np.concatenate(train_labels)
      model.fit(X_train, y_train)
